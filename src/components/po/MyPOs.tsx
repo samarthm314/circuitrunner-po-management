@@ -181,17 +181,12 @@ export const MyPOs: React.FC = () => {
                     {/* Show decline reason only for declined POs */}
                     {po.status === 'declined' && po.adminComments && (
                       <div className="mt-3 p-4 bg-red-900/30 border border-red-700 rounded-lg">
-                        <div className="flex items-start space-x-2">
-                          <div className="flex-shrink-0">
-                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
-                          </div>
-                          <div>
-                            <span className="text-sm font-medium text-red-300">Reason for Decline:</span>
-                            <p className="text-sm text-red-200 mt-1">{po.adminComments}</p>
-                            <p className="text-xs text-red-300 mt-2 italic">
-                              You can edit this PO to address the concerns and resubmit for approval.
-                            </p>
-                          </div>
+                        <div>
+                          <span className="text-sm font-medium text-red-300">Reason for Decline:</span>
+                          <p className="text-sm text-red-200 mt-1">{po.adminComments}</p>
+                          <p className="text-xs text-red-300 mt-2 italic">
+                            You can edit this PO to address the concerns and resubmit for approval.
+                          </p>
                         </div>
                       </div>
                     )}
