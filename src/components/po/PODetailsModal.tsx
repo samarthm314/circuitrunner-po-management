@@ -16,6 +16,7 @@ interface PODetailsModalProps {
 export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onClose }) => {
   const { userProfile } = useAuth();
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
+  const [downloadLoading, setDownloadLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -52,8 +53,11 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
     }));
   };
 
-  const downloadSummary = () => {
+  const downloadSummary = async () => {
+    setDownloadLoading(true);
     try {
+      console.log('Starting download summary...');
+      
       // Prepare PO summary data
       const summaryData = {
         'PO Number': `#${po.id.slice(-6).toUpperCase()}`,
@@ -62,6 +66,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
         'Sub-Organization': po.subOrgName,
         'Total Amount': `$${po.totalAmount.toFixed(2)}`,
         'Created Date': po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
+        'Approved Date': po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
+        'Purchased Date': po.purchasedAt ? format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Special Request': po.specialRequest || 'None',
         'Over Budget Justification': po.overBudgetJustification || 'N/A',
         'Admin Comments': po.adminComments || 'None'
@@ -80,27 +86,61 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
         'Purchased': userProfile?.role === 'purchaser' && checkedItems[index] ? 'Yes' : 'No'
       }));
 
+      console.log('Creating workbook...');
+      
       // Create workbook
       const wb = XLSX.utils.book_new();
 
       // Add PO Summary sheet
       const summaryWs = XLSX.utils.json_to_sheet([summaryData]);
+      
+      // Set column widths for summary sheet
+      const summaryColWidths = [
+        { wch: 25 }, // Field names
+        { wch: 30 }  // Values
+      ];
+      summaryWs['!cols'] = summaryColWidths;
+      
       XLSX.utils.book_append_sheet(wb, summaryWs, 'PO Summary');
 
       // Add Line Items sheet
       const lineItemsWs = XLSX.utils.json_to_sheet(lineItemsData);
+      
+      // Set column widths for line items sheet
+      const lineItemsColWidths = [
+        { wch: 8 },  // Item #
+        { wch: 20 }, // Vendor
+        { wch: 30 }, // Item Name
+        { wch: 15 }, // SKU
+        { wch: 10 }, // Quantity
+        { wch: 12 }, // Unit Price
+        { wch: 12 }, // Total Price
+        { wch: 40 }, // Product Link
+        { wch: 10 }  // Purchased
+      ];
+      lineItemsWs['!cols'] = lineItemsColWidths;
+      
       XLSX.utils.book_append_sheet(wb, lineItemsWs, 'Line Items');
 
+      console.log('Generating filename...');
+      
       // Generate filename
       const poNumber = po.id.slice(-6).toUpperCase();
       const date = new Date().toISOString().split('T')[0];
       const filename = `PO_${poNumber}_Summary_${date}.xlsx`;
 
+      console.log('Writing file:', filename);
+      
       // Download file
       XLSX.writeFile(wb, filename);
+      
+      console.log('Download completed successfully');
+      
     } catch (error) {
       console.error('Error generating PO summary:', error);
       alert('Error generating PO summary. Please try again.');
+    } finally {
+      setDownloadLoading(false);
     }
   };
 
@@ -123,6 +163,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               variant="outline"
               size="sm"
               onClick={downloadSummary}
+              loading={downloadLoading}
+              disabled={downloadLoading}
             >
               <Download className="h-4 w-4 mr-2" />
               Download Summary
