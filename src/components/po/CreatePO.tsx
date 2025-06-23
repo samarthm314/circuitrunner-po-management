@@ -21,6 +21,10 @@ export const CreatePO: React.FC = () => {
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', totalPrice: 0 }
   ]);
+  // Track the raw input values for price fields
+  const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({
+    '1': ''
+  });
 
   useEffect(() => {
     const fetchSubOrganizations = async () => {
@@ -38,8 +42,9 @@ export const CreatePO: React.FC = () => {
   }, []);
 
   const addLineItem = () => {
+    const newId = Date.now().toString();
     const newItem: LineItem = {
-      id: Date.now().toString(),
+      id: newId,
       vendor: '',
       itemName: '',
       sku: '',
@@ -49,11 +54,17 @@ export const CreatePO: React.FC = () => {
       totalPrice: 0
     };
     setLineItems([...lineItems, newItem]);
+    setPriceInputs(prev => ({ ...prev, [newId]: '' }));
   };
 
   const removeLineItem = (id: string) => {
     if (lineItems.length > 1) {
       setLineItems(lineItems.filter(item => item.id !== id));
+      setPriceInputs(prev => {
+        const newInputs = { ...prev };
+        delete newInputs[id];
+        return newInputs;
+      });
     }
   };
 
@@ -71,7 +82,10 @@ export const CreatePO: React.FC = () => {
   };
 
   const handlePriceChange = (id: string, value: string) => {
-    // Remove any non-numeric characters except decimal point
+    // Store the raw input value
+    setPriceInputs(prev => ({ ...prev, [id]: value }));
+    
+    // Clean the value for numeric conversion
     const cleanValue = value.replace(/[^\d.]/g, '');
     
     // Handle multiple decimal points - keep only the first one
@@ -86,9 +100,20 @@ export const CreatePO: React.FC = () => {
     updateLineItem(id, 'unitPrice', numericValue);
   };
 
-  const formatDisplayPrice = (price: number): string => {
-    if (price === 0) return '';
-    return price.toFixed(2);
+  const handlePriceBlur = (id: string) => {
+    // Format the price when the user leaves the field
+    const item = lineItems.find(item => item.id === id);
+    if (item && item.unitPrice > 0) {
+      setPriceInputs(prev => ({ ...prev, [id]: item.unitPrice.toFixed(2) }));
+    }
+  };
+
+  const handlePriceFocus = (id: string) => {
+    // When focusing, show the raw numeric value without formatting
+    const item = lineItems.find(item => item.id === id);
+    if (item && item.unitPrice > 0) {
+      setPriceInputs(prev => ({ ...prev, [id]: item.unitPrice.toString() }));
+    }
   };
 
   const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -268,8 +293,10 @@ export const CreatePO: React.FC = () => {
                     <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
                     <input
                       type="text"
-                      value={formatDisplayPrice(item.unitPrice)}
+                      value={priceInputs[item.id] || ''}
                       onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                      onFocus={() => handlePriceFocus(item.id)}
+                      onBlur={() => handlePriceBlur(item.id)}
                       className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
                       required
