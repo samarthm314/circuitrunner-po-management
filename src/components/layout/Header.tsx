@@ -19,22 +19,22 @@ export const Header: React.FC = () => {
 
   return (
     <header className="bg-gray-800 shadow-sm border-b border-gray-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Left side - Logo and title pushed to the left */}
-          <div className="flex items-center">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16 w-full">
+          {/* Left side - Logo and title pushed all the way to the left */}
+          <div className="flex items-center flex-shrink-0">
             <img 
               src="/5226055 (1).png" 
               alt="CircuitRunners Logo" 
               className="h-8 w-8"
             />
-            <h1 className="ml-2 text-xl font-bold text-gray-100">
+            <h1 className="ml-2 text-xl font-bold text-gray-100 whitespace-nowrap">
               CircuitRunners PO System
             </h1>
           </div>
           
-          {/* Right side - User controls pushed to the right */}
-          <div className="flex items-center space-x-4">
+          {/* Right side - User controls pushed all the way to the right */}
+          <div className="flex items-center space-x-4 flex-shrink-0">
             <NotificationDropdown />
             
             <div className="flex items-center space-x-3">
