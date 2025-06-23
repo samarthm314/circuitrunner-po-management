@@ -121,6 +121,21 @@ export const CreatePO: React.FC = () => {
   const remainingBudget = selectedOrg ? selectedOrg.budgetAllocated - selectedOrg.budgetSpent : 0;
   const isOverBudget = totalAmount > remainingBudget;
 
+  const sortLineItemsByVendor = (items: LineItem[]): LineItem[] => {
+    return [...items].sort((a, b) => {
+      // Sort alphabetically by vendor name (case-insensitive)
+      const vendorA = a.vendor.toLowerCase().trim();
+      const vendorB = b.vendor.toLowerCase().trim();
+      
+      // Handle empty vendors - put them at the end
+      if (!vendorA && !vendorB) return 0;
+      if (!vendorA) return 1;
+      if (!vendorB) return -1;
+      
+      return vendorA.localeCompare(vendorB);
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -144,12 +159,15 @@ export const CreatePO: React.FC = () => {
     setLoading(true);
 
     try {
+      // Sort line items alphabetically by vendor before submitting
+      const sortedLineItems = sortLineItemsByVendor(validLineItems);
+
       const poData: any = {
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
         subOrgId: selectedSubOrg,
         subOrgName: selectedOrg.name,
-        lineItems: validLineItems,
+        lineItems: sortedLineItems, // Use sorted line items
         totalAmount,
       };
 
@@ -164,7 +182,7 @@ export const CreatePO: React.FC = () => {
 
       await createPO(poData);
 
-      alert('Purchase Order submitted successfully!');
+      alert('Purchase Order submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
       navigate('/my-pos');
     } catch (error) {
       console.error('Error submitting PO:', error);
@@ -235,7 +253,12 @@ export const CreatePO: React.FC = () => {
         {/* Line Items */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Line Items</CardTitle>
+            <div>
+              <CardTitle>Line Items</CardTitle>
+              <p className="text-sm text-gray-400 mt-1">
+                Items will be sorted alphabetically by vendor when submitted
+              </p>
+            </div>
             <Button type="button" onClick={addLineItem} variant="outline" size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Add Item
