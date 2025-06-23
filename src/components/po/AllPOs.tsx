@@ -111,6 +111,50 @@ export const AllPOs: React.FC = () => {
     fetchAllPOs();
   };
 
+  // Group and sort POs by status
+  const groupPOsByStatus = (pos: PurchaseOrder[]) => {
+    const statusOrder = ['pending_approval', 'approved', 'pending_purchase', 'draft', 'declined', 'purchased'];
+    const statusLabels = {
+      draft: 'Drafts',
+      pending_approval: 'Pending Approval',
+      approved: 'Approved',
+      pending_purchase: 'Pending Purchase',
+      declined: 'Declined',
+      purchased: 'Purchased',
+    };
+
+    const grouped: { [key: string]: PurchaseOrder[] } = {};
+    
+    // Group POs by status
+    pos.forEach(po => {
+      if (!grouped[po.status]) {
+        grouped[po.status] = [];
+      }
+      grouped[po.status].push(po);
+    });
+
+    // Sort within each group by newest first
+    Object.keys(grouped).forEach(status => {
+      grouped[status].sort((a, b) => {
+        const aTime = a.updatedAt?.seconds || a.createdAt?.seconds || 0;
+        const bTime = b.updatedAt?.seconds || b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+    });
+
+    // Return in the desired order
+    return statusOrder
+      .filter(status => grouped[status] && grouped[status].length > 0)
+      .map(status => ({
+        status,
+        label: statusLabels[status as keyof typeof statusLabels],
+        pos: grouped[status],
+        count: grouped[status].length
+      }));
+  };
+
+  const groupedPOs = groupPOsByStatus(filteredPOs);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -161,6 +205,8 @@ export const AllPOs: React.FC = () => {
       {/* Results */}
       <div className="text-sm text-gray-400 mb-4">
         Showing {filteredPOs.length} of {pos.length} purchase orders
+        {statusFilter !== 'all' && ` (filtered by ${statusFilter.replace('_', ' ')})`}
+        {searchTerm && ` (search: "${searchTerm}")`}
       </div>
 
       {filteredPOs.length === 0 ? (
@@ -171,73 +217,99 @@ export const AllPOs: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {filteredPOs.map((po) => (
-            <Card key={po.id}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-100">
-                      PO #{po.id.slice(-6).toUpperCase()}
-                    </h3>
-                    {getStatusBadge(po.status)}
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-300 mb-3">
-                    <div>
-                      <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-200">Created:</span> {
-                        po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
-                      }
-                    </div>
-                  </div>
-
-                  <div className="text-sm text-gray-300">
-                    <span className="font-medium text-gray-200">Items:</span> {po.lineItems.length} line item{po.lineItems.length !== 1 ? 's' : ''}
-                    {po.lineItems.slice(0, 2).map((item, index) => (
-                      <span key={index} className="ml-2">
-                        • {item.itemName} ({item.quantity}x)
-                        {item.sku && ` [${item.sku}]`}
-                      </span>
-                    ))}
-                    {po.lineItems.length > 2 && (
-                      <span className="ml-2 text-gray-400">
-                        +{po.lineItems.length - 2} more
-                      </span>
-                    )}
-                  </div>
+        <div className="space-y-8">
+          {groupedPOs.map(({ status, label, pos: statusPOs, count }) => (
+            <div key={status} className="space-y-4">
+              {/* Category Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-semibold text-gray-100">{label}</h2>
+                  <Badge variant="info" size="md">
+                    {count} PO{count !== 1 ? 's' : ''}
+                  </Badge>
                 </div>
-
-                <div className="flex space-x-2 ml-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleViewDetails(po)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View Details
-                  </Button>
-                  <Button 
-                    variant="danger" 
-                    size="sm"
-                    onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
-                    loading={deleteLoading === po.id}
-                    disabled={deleteLoading !== null}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
+                <div className="text-sm text-gray-400">
+                  Sorted by newest first
                 </div>
               </div>
-            </Card>
+
+              {/* POs in this category */}
+              <div className="space-y-4">
+                {statusPOs.map((po) => (
+                  <Card key={po.id}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-100">
+                            PO #{po.id.slice(-6).toUpperCase()}
+                          </h3>
+                          {getStatusBadge(po.status)}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-300 mb-3">
+                          <div>
+                            <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-200">
+                              {po.status === 'draft' ? 'Last Updated:' : 'Created:'}
+                            </span> {
+                              po.updatedAt && po.status === 'draft' 
+                                ? format(new Date(po.updatedAt.seconds * 1000), 'MMM dd, yyyy')
+                                : po.createdAt 
+                                  ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') 
+                                  : 'N/A'
+                            }
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-gray-300">
+                          <span className="font-medium text-gray-200">Items:</span> {po.lineItems.length} line item{po.lineItems.length !== 1 ? 's' : ''}
+                          {po.lineItems.slice(0, 2).map((item, index) => (
+                            <span key={index} className="ml-2">
+                              • {item.itemName} ({item.quantity}x)
+                              {item.sku && ` [${item.sku}]`}
+                            </span>
+                          ))}
+                          {po.lineItems.length > 2 && (
+                            <span className="ml-2 text-gray-400">
+                              +{po.lineItems.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2 ml-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewDetails(po)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View Details
+                        </Button>
+                        <Button 
+                          variant="danger" 
+                          size="sm"
+                          onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                          loading={deleteLoading === po.id}
+                          disabled={deleteLoading !== null}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}

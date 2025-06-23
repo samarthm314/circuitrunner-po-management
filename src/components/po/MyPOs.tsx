@@ -114,6 +114,50 @@ export const MyPOs: React.FC = () => {
     return Edit;
   };
 
+  // Group and sort POs by status
+  const groupPOsByStatus = (pos: PurchaseOrder[]) => {
+    const statusOrder = ['draft', 'pending_approval', 'approved', 'pending_purchase', 'declined', 'purchased'];
+    const statusLabels = {
+      draft: 'Drafts',
+      pending_approval: 'Pending Approval',
+      approved: 'Approved',
+      pending_purchase: 'Pending Purchase',
+      declined: 'Declined',
+      purchased: 'Purchased',
+    };
+
+    const grouped: { [key: string]: PurchaseOrder[] } = {};
+    
+    // Group POs by status
+    pos.forEach(po => {
+      if (!grouped[po.status]) {
+        grouped[po.status] = [];
+      }
+      grouped[po.status].push(po);
+    });
+
+    // Sort within each group by newest first
+    Object.keys(grouped).forEach(status => {
+      grouped[status].sort((a, b) => {
+        const aTime = a.updatedAt?.seconds || a.createdAt?.seconds || 0;
+        const bTime = b.updatedAt?.seconds || b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+    });
+
+    // Return in the desired order
+    return statusOrder
+      .filter(status => grouped[status] && grouped[status].length > 0)
+      .map(status => ({
+        status,
+        label: statusLabels[status as keyof typeof statusLabels],
+        pos: grouped[status],
+        count: grouped[status].length
+      }));
+  };
+
+  const groupedPOs = groupPOsByStatus(pos);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,129 +183,160 @@ export const MyPOs: React.FC = () => {
           </div>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {pos.map((po) => {
-            const EditIcon = getEditButtonIcon(po);
-            
-            return (
-              <Card key={po.id}>
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-100">
-                        PO #{po.id.slice(-6).toUpperCase()}
-                      </h3>
-                      {getStatusBadge(po.status)}
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
-                      <div>
-                        <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-200">Created:</span> {
-                          po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
-                        }
-                      </div>
-                    </div>
+        <div className="space-y-8">
+          {groupedPOs.map(({ status, label, pos: statusPOs, count }) => (
+            <div key={status} className="space-y-4">
+              {/* Category Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-semibold text-gray-100">{label}</h2>
+                  <Badge variant="info" size="md">
+                    {count} PO{count !== 1 ? 's' : ''}
+                  </Badge>
+                </div>
+                <div className="text-sm text-gray-400">
+                  Sorted by newest first
+                </div>
+              </div>
 
-                    {po.specialRequest && (
-                      <div className="mt-3">
-                        <span className="text-sm font-medium text-gray-200">Special Request:</span>
-                        <p className="text-sm text-gray-300 mt-1">{po.specialRequest}</p>
-                      </div>
-                    )}
-
-                    {/* Show admin comments only for approved POs */}
-                    {po.status === 'approved' && po.adminComments && (
-                      <div className="mt-3 p-3 bg-green-900/30 border border-green-700 rounded-lg">
-                        <span className="text-sm font-medium text-green-300">Admin Comments:</span>
-                        <p className="text-sm text-green-200 mt-1">{po.adminComments}</p>
-                      </div>
-                    )}
-
-                    {/* Show decline reason only for declined POs */}
-                    {po.status === 'declined' && po.adminComments && (
-                      <div className="mt-3 p-4 bg-red-900/30 border border-red-700 rounded-lg">
-                        <div>
-                          <span className="text-sm font-medium text-red-300">Reason for Decline:</span>
-                          <p className="text-sm text-red-200 mt-1">{po.adminComments}</p>
-                          <p className="text-xs text-red-300 mt-2 italic">
-                            You can edit this PO to address the concerns and resubmit for approval.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-200 mb-2">Line Items:</h4>
-                      <div className="space-y-2">
-                        {po.lineItems.map((item, index) => (
-                          <div key={index} className="flex justify-between items-center text-sm bg-gray-700 p-2 rounded">
-                            <div className="flex-1">
-                              <span className="font-medium text-gray-100">{item.itemName}</span>
-                              <span className="text-gray-400 ml-2">from {item.vendor}</span>
-                              {item.sku && (
-                                <span className="text-gray-400 ml-2">SKU: {item.sku}</span>
-                              )}
+              {/* POs in this category */}
+              <div className="space-y-4">
+                {statusPOs.map((po) => {
+                  const EditIcon = getEditButtonIcon(po);
+                  
+                  return (
+                    <Card key={po.id}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="text-lg font-semibold text-gray-100">
+                              PO #{po.id.slice(-6).toUpperCase()}
+                            </h3>
+                            {getStatusBadge(po.status)}
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
+                            <div>
+                              <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <span className="text-gray-300">{item.quantity} × ${item.unitPrice.toFixed(2)}</span>
-                              <span className="font-medium text-gray-100">${item.totalPrice.toFixed(2)}</span>
-                              {item.link && (
-                                <a
-                                  href={item.link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-green-400 hover:text-green-300"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
+                            <div>
+                              <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-200">
+                                {po.status === 'draft' ? 'Last Updated:' : 'Created:'}
+                              </span> {
+                                po.updatedAt && po.status === 'draft' 
+                                  ? format(new Date(po.updatedAt.seconds * 1000), 'MMM dd, yyyy')
+                                  : po.createdAt 
+                                    ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') 
+                                    : 'N/A'
+                              }
+                            </div>
+                          </div>
+
+                          {po.specialRequest && (
+                            <div className="mt-3">
+                              <span className="text-sm font-medium text-gray-200">Special Request:</span>
+                              <p className="text-sm text-gray-300 mt-1">{po.specialRequest}</p>
+                            </div>
+                          )}
+
+                          {/* Show admin comments only for approved POs */}
+                          {po.status === 'approved' && po.adminComments && (
+                            <div className="mt-3 p-3 bg-green-900/30 border border-green-700 rounded-lg">
+                              <span className="text-sm font-medium text-green-300">Admin Comments:</span>
+                              <p className="text-sm text-green-200 mt-1">{po.adminComments}</p>
+                            </div>
+                          )}
+
+                          {/* Show decline reason only for declined POs */}
+                          {po.status === 'declined' && po.adminComments && (
+                            <div className="mt-3 p-4 bg-red-900/30 border border-red-700 rounded-lg">
+                              <div>
+                                <span className="text-sm font-medium text-red-300">Reason for Decline:</span>
+                                <p className="text-sm text-red-200 mt-1">{po.adminComments}</p>
+                                <p className="text-xs text-red-300 mt-2 italic">
+                                  You can edit this PO to address the concerns and resubmit for approval.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-200 mb-2">Line Items:</h4>
+                            <div className="space-y-2">
+                              {po.lineItems.slice(0, 3).map((item, index) => (
+                                <div key={index} className="flex justify-between items-center text-sm bg-gray-700 p-2 rounded">
+                                  <div className="flex-1">
+                                    <span className="font-medium text-gray-100">{item.itemName}</span>
+                                    <span className="text-gray-400 ml-2">from {item.vendor}</span>
+                                    {item.sku && (
+                                      <span className="text-gray-400 ml-2">SKU: {item.sku}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-gray-300">{item.quantity} × ${item.unitPrice.toFixed(2)}</span>
+                                    <span className="font-medium text-gray-100">${item.totalPrice.toFixed(2)}</span>
+                                    {item.link && (
+                                      <a
+                                        href={item.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-green-400 hover:text-green-300"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                              {po.lineItems.length > 3 && (
+                                <div className="text-sm text-gray-400 text-center py-1">
+                                  +{po.lineItems.length - 3} more items
+                                </div>
                               )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                        </div>
 
-                  <div className="flex space-x-2 ml-4">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => handleViewDetails(po)}
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View
-                    </Button>
-                    {canEditPO(po) && (
-                      <Button 
-                        variant={po.status === 'declined' ? 'primary' : 'outline'}
-                        size="sm"
-                        onClick={() => handleEditPO(po.id)}
-                      >
-                        <EditIcon className="h-4 w-4 mr-1" />
-                        {getEditButtonText(po)}
-                      </Button>
-                    )}
-                    <Button 
-                      variant="danger" 
-                      size="sm"
-                      onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
-                      loading={deleteLoading === po.id}
-                      disabled={deleteLoading !== null}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+                        <div className="flex space-x-2 ml-4">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleViewDetails(po)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                          {canEditPO(po) && (
+                            <Button 
+                              variant={po.status === 'declined' ? 'primary' : 'outline'}
+                              size="sm"
+                              onClick={() => handleEditPO(po.id)}
+                            >
+                              <EditIcon className="h-4 w-4 mr-1" />
+                              {getEditButtonText(po)}
+                            </Button>
+                          )}
+                          <Button 
+                            variant="danger" 
+                            size="sm"
+                            onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                            loading={deleteLoading === po.id}
+                            disabled={deleteLoading !== null}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
