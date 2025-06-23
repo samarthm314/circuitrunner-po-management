@@ -77,6 +77,8 @@ export const Dashboard: React.FC = () => {
   const handlePendingPOsClick = () => {
     if (userProfile?.role === 'admin') {
       navigate('/pending-approval');
+    } else if (userProfile?.role === 'purchaser') {
+      navigate('/pending-purchase');
     }
   };
 
@@ -87,6 +89,8 @@ export const Dashboard: React.FC = () => {
       navigate('/my-pos');
     }
   };
+
+  const isPendingPOsClickable = userProfile?.role === 'admin' || userProfile?.role === 'purchaser';
 
   if (loading) {
     return (
@@ -137,11 +141,11 @@ export const Dashboard: React.FC = () => {
 
         <Card 
           className={`p-6 ${
-            userProfile?.role === 'admin' 
+            isPendingPOsClickable 
               ? 'cursor-pointer hover:bg-gray-700/50 transition-colors' 
               : ''
           }`}
-          onClick={handlePendingPOsClick}
+          onClick={isPendingPOsClickable ? handlePendingPOsClick : undefined}
         >
           <div className="flex items-center">
             <div className="p-2 bg-blue-900/50 rounded-lg border border-blue-700">
@@ -150,8 +154,10 @@ export const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-400">Pending POs</p>
               <p className="text-2xl font-bold text-gray-100">{stats.pendingPOs}</p>
-              {userProfile?.role === 'admin' && stats.pendingPOs > 0 && (
-                <p className="text-xs text-blue-400 mt-1">Click to review</p>
+              {isPendingPOsClickable && stats.pendingPOs > 0 && (
+                <p className="text-xs text-blue-400 mt-1">
+                  {userProfile?.role === 'admin' ? 'Click to review' : 'Click to purchase'}
+                </p>
               )}
             </div>
           </div>
