@@ -170,14 +170,15 @@ export const MyPOs: React.FC = () => {
                       </div>
                     )}
 
-                    {po.adminComments && (
-                      <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg">
-                        <span className="text-sm font-medium text-yellow-300">Admin Comments:</span>
-                        <p className="text-sm text-yellow-200 mt-1">{po.adminComments}</p>
+                    {/* Show admin comments only for approved POs */}
+                    {po.status === 'approved' && po.adminComments && (
+                      <div className="mt-3 p-3 bg-green-900/30 border border-green-700 rounded-lg">
+                        <span className="text-sm font-medium text-green-300">Admin Comments:</span>
+                        <p className="text-sm text-green-200 mt-1">{po.adminComments}</p>
                       </div>
                     )}
 
-                    {/* Show decline reason prominently for declined POs */}
+                    {/* Show decline reason only for declined POs */}
                     {po.status === 'declined' && po.adminComments && (
                       <div className="mt-3 p-4 bg-red-900/30 border border-red-700 rounded-lg">
                         <div className="flex items-start space-x-2">
