@@ -26,6 +26,7 @@ export interface LineItem {
 
 export interface PurchaseOrder {
   id: string;
+  name: string; // Added PO name field
   creatorId: string;
   creatorName: string;
   subOrgId: string;

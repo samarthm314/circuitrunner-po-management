@@ -36,8 +36,8 @@ export const MyPOs: React.FC = () => {
     }
   };
 
-  const handleDeletePO = async (poId: string, poNumber: string) => {
-    if (!confirm(`Are you sure you want to delete PO #${poNumber}? This action cannot be undone.`)) {
+  const handleDeletePO = async (poId: string, poName: string) => {
+    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -210,7 +210,7 @@ export const MyPOs: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-100">
-                              PO #{po.id.slice(-6).toUpperCase()}
+                              {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
                             </h3>
                             {getStatusBadge(po.status)}
                           </div>
@@ -322,7 +322,7 @@ export const MyPOs: React.FC = () => {
                           <Button 
                             variant="danger" 
                             size="sm"
-                            onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                            onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
                             loading={deleteLoading === po.id}
                             disabled={deleteLoading !== null}
                           >

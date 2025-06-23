@@ -98,6 +98,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
       
       // Prepare PO summary data
       const summaryData = {
+        'PO Name': po.name || `PO #${po.id.slice(-6).toUpperCase()}`,
         'PO Number': `#${po.id.slice(-6).toUpperCase()}`,
         'Status': po.status.charAt(0).toUpperCase() + po.status.slice(1).replace('_', ' '),
         'Created By': po.creatorName,
@@ -163,9 +164,10 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
       console.log('Generating filename...');
       
       // Generate filename
-      const poNumber = po.id.slice(-6).toUpperCase();
+      const poName = po.name || `PO_${po.id.slice(-6).toUpperCase()}`;
+      const safeName = poName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const date = new Date().toISOString().split('T')[0];
-      const filename = `PO_${poNumber}_Summary_${date}.xlsx`;
+      const filename = `${safeName}_Summary_${date}.xlsx`;
 
       console.log('Writing file:', filename);
       
@@ -192,7 +194,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
             <h2 className="text-2xl font-bold text-gray-100">
-              PO #{po.id.slice(-6).toUpperCase()}
+              {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
             </h2>
             {getStatusBadge(po.status)}
             {updatingStatus && (

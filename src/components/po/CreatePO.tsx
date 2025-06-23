@@ -16,6 +16,7 @@ export const CreatePO: React.FC = () => {
   const editId = searchParams.get('edit');
   
   const [subOrganizations, setSubOrganizations] = useState<SubOrganization[]>([]);
+  const [poName, setPOName] = useState('');
   const [selectedSubOrg, setSelectedSubOrg] = useState<string>('');
   const [specialRequest, setSpecialRequest] = useState('');
   const [overBudgetJustification, setOverBudgetJustification] = useState('');
@@ -64,6 +65,7 @@ export const CreatePO: React.FC = () => {
         setIsEditing(true);
         setEditingPOId(poId);
         setOriginalPOStatus(po.status);
+        setPOName(po.name || '');
         setSelectedSubOrg(po.subOrgId);
         setSpecialRequest(po.specialRequest || '');
         setOverBudgetJustification(po.overBudgetJustification || '');
@@ -184,6 +186,11 @@ export const CreatePO: React.FC = () => {
   };
 
   const validateForm = (isDraft: boolean = false) => {
+    if (!poName.trim()) {
+      alert('Please enter a name for this Purchase Order');
+      return false;
+    }
+
     if (!selectedOrg) {
       alert('Please select a sub-organization');
       return false;
@@ -218,6 +225,7 @@ export const CreatePO: React.FC = () => {
 
     try {
       const poData: any = {
+        name: poName.trim(),
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
         subOrgId: selectedSubOrg,
@@ -279,6 +287,7 @@ export const CreatePO: React.FC = () => {
       const sortedLineItems = sortLineItemsByVendor(validLineItems);
 
       const poData: any = {
+        name: poName.trim(),
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
         subOrgId: selectedSubOrg,
@@ -399,15 +408,32 @@ export const CreatePO: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Sub-Organization Selection */}
+        {/* PO Name and Sub-Organization */}
         <Card>
           <CardHeader>
-            <CardTitle>Sub-Organization & Budget</CardTitle>
+            <CardTitle>Purchase Order Details</CardTitle>
           </CardHeader>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Select Sub-Organization
+                Purchase Order Name <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={poName}
+                onChange={(e) => setPOName(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                placeholder="Enter a descriptive name for this PO (e.g., 'FTC Robot Parts Q1 2024', 'Marketing Materials Spring Campaign')"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Choose a clear, descriptive name that will help identify this PO later
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Select Sub-Organization <span className="text-red-400">*</span>
               </label>
               <select
                 value={selectedSubOrg}
@@ -609,6 +635,9 @@ export const CreatePO: React.FC = () => {
             <div>
               <h3 className="text-lg font-semibold text-gray-100">PO Summary</h3>
               <p className="text-sm text-gray-300">{lineItems.length} line items</p>
+              {poName && (
+                <p className="text-sm text-gray-400 mt-1">Name: {poName}</p>
+              )}
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-gray-100">${totalAmount.toFixed(2)}</p>

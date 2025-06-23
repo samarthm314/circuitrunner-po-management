@@ -33,7 +33,8 @@ export const AllPOs: React.FC = () => {
       filtered = filtered.filter(po => 
         po.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.subOrgName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.id.toLowerCase().includes(searchTerm.toLowerCase())
+        po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (po.name && po.name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -52,8 +53,8 @@ export const AllPOs: React.FC = () => {
     }
   };
 
-  const handleDeletePO = async (poId: string, poNumber: string) => {
-    if (!confirm(`Are you sure you want to delete PO #${poNumber}? This action cannot be undone.`)) {
+  const handleDeletePO = async (poId: string, poName: string) => {
+    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -177,7 +178,7 @@ export const AllPOs: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by creator, sub-org, or PO ID..."
+                placeholder="Search by name, creator, sub-org, or PO ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
@@ -241,7 +242,7 @@ export const AllPOs: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
                           <h3 className="text-lg font-semibold text-gray-100">
-                            PO #{po.id.slice(-6).toUpperCase()}
+                            {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
                           </h3>
                           {getStatusBadge(po.status)}
                         </div>
@@ -297,7 +298,7 @@ export const AllPOs: React.FC = () => {
                         <Button 
                           variant="danger" 
                           size="sm"
-                          onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                          onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
                           loading={deleteLoading === po.id}
                           disabled={deleteLoading !== null}
                         >
