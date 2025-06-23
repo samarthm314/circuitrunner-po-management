@@ -70,28 +70,25 @@ export const CreatePO: React.FC = () => {
     }));
   };
 
-  const formatPriceInput = (value: string): string => {
-    // Remove any non-digit and non-decimal characters
-    const cleaned = value.replace(/[^\d.]/g, '');
-    
-    // Handle multiple decimal points
-    const parts = cleaned.split('.');
-    if (parts.length > 2) {
-      return parts[0] + '.' + parts.slice(1).join('');
-    }
-    
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      return parts[0] + '.' + parts[1].substring(0, 2);
-    }
-    
-    return cleaned;
-  };
-
   const handlePriceChange = (id: string, value: string) => {
-    const formattedValue = formatPriceInput(value);
+    // Remove any non-numeric characters except decimal point
+    const cleanValue = value.replace(/[^\d.]/g, '');
+    
+    // Handle multiple decimal points - keep only the first one
+    const parts = cleanValue.split('.');
+    let formattedValue = parts[0];
+    if (parts.length > 1) {
+      formattedValue += '.' + parts.slice(1).join('').substring(0, 2);
+    }
+    
+    // Convert to number for storage
     const numericValue = parseFloat(formattedValue) || 0;
     updateLineItem(id, 'unitPrice', numericValue);
+  };
+
+  const formatDisplayPrice = (price: number): string => {
+    if (price === 0) return '';
+    return price.toFixed(2);
   };
 
   const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -271,13 +268,8 @@ export const CreatePO: React.FC = () => {
                     <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
                     <input
                       type="text"
-                      value={item.unitPrice === 0 ? '' : item.unitPrice.toFixed(2)}
+                      value={formatDisplayPrice(item.unitPrice)}
                       onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                      onFocus={(e) => {
-                        if (item.unitPrice === 0) {
-                          e.target.value = '0.00';
-                        }
-                      }}
                       className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
                       required
