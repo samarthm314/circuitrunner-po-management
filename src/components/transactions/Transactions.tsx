@@ -24,9 +24,11 @@ import {
   processExcelData 
 } from '../../services/transactionService';
 import { getSubOrganizations, updateSubOrgBudget } from '../../services/subOrgService';
+import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
+  const { userProfile } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +127,7 @@ export const Transactions: React.FC = () => {
         notes: editData.notes || '', // Ensure notes is never undefined
       });
 
-      // Recalculate budget spent for all sub-organizations
+      // Recalculate budget spent for all sub-organizations (only for admin users)
       await recalculateBudgets();
       
       await fetchData();
@@ -138,6 +140,11 @@ export const Transactions: React.FC = () => {
   };
 
   const recalculateBudgets = async () => {
+    // Only allow admin users to update budgets
+    if (userProfile?.role !== 'admin') {
+      return; // Skip budget recalculation for non-admin users
+    }
+
     try {
       // Calculate spent amounts for each sub-org based on transactions
       const spentBySubOrg: { [key: string]: number } = {};
