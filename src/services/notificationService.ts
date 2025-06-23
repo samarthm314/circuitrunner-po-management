@@ -124,33 +124,34 @@ const getRecentTransactions = async (): Promise<Transaction[]> => {
 const generateDirectorNotifications = (pos: PurchaseOrder[], subOrgs: SubOrganization[]): Notification[] => {
   const notifications: Notification[] = [];
   
-  // PO status updates for director's own POs
-  const recentPOUpdates = pos.filter(po => 
-    po.status === 'approved' || po.status === 'declined' || po.status === 'purchased'
-  ).slice(0, 5);
+  // Only show notifications for very recent PO updates (last 2 hours)
+  const twoHoursAgo = Date.now() - (2 * 60 * 60 * 1000);
+  
+  const recentPOUpdates = pos.filter(po => {
+    if (po.status !== 'approved' && po.status !== 'declined' && po.status !== 'purchased') return false;
+    const timestamp = po.updatedAt ? new Date(po.updatedAt.seconds * 1000) : new Date(0);
+    return timestamp.getTime() > twoHoursAgo;
+  }).slice(0, 3);
 
   recentPOUpdates.forEach(po => {
     const timestamp = po.updatedAt ? new Date(po.updatedAt.seconds * 1000) : new Date();
-    const isRecent = (Date.now() - timestamp.getTime()) < (24 * 60 * 60 * 1000); // 24 hours
     
-    if (isRecent) {
-      notifications.push({
-        id: `po-${po.id}`,
-        type: 'po_status',
-        title: `PO ${po.status.charAt(0).toUpperCase() + po.status.slice(1)}`,
-        message: `PO #${po.id.slice(-6).toUpperCase()} has been ${po.status}`,
-        timestamp,
-        isRead: false,
-        priority: po.status === 'declined' ? 'high' : 'medium',
-        actionUrl: '/my-pos',
-        icon: po.status === 'approved' ? 'CheckCircle' : po.status === 'declined' ? 'XCircle' : 'ShoppingCart'
-      });
-    }
+    notifications.push({
+      id: `po-${po.id}`,
+      type: 'po_status',
+      title: `PO ${po.status.charAt(0).toUpperCase() + po.status.slice(1)}`,
+      message: `PO #${po.id.slice(-6).toUpperCase()} has been ${po.status}`,
+      timestamp,
+      isRead: false,
+      priority: po.status === 'declined' ? 'high' : 'medium',
+      actionUrl: '/my-pos',
+      icon: po.status === 'approved' ? 'CheckCircle' : po.status === 'declined' ? 'XCircle' : 'ShoppingCart'
+    });
   });
 
-  // Budget alerts
-  const budgetAlerts = generateBudgetAlerts(subOrgs);
-  notifications.push(...budgetAlerts);
+  // Only show critical budget alerts (over 95% or over budget)
+  const criticalBudgetAlerts = generateCriticalBudgetAlerts(subOrgs);
+  notifications.push(...criticalBudgetAlerts);
 
   return notifications;
 };
@@ -158,7 +159,7 @@ const generateDirectorNotifications = (pos: PurchaseOrder[], subOrgs: SubOrganiz
 const generateAdminNotifications = (pos: PurchaseOrder[], subOrgs: SubOrganization[], transactions: Transaction[]): Notification[] => {
   const notifications: Notification[] = [];
   
-  // Pending approval notifications
+  // Pending approval notifications - only if there are actually pending POs
   const pendingPOs = pos.filter(po => po.status === 'pending_approval');
   if (pendingPOs.length > 0) {
     notifications.push({
@@ -174,15 +175,15 @@ const generateAdminNotifications = (pos: PurchaseOrder[], subOrgs: SubOrganizati
     });
   }
 
-  // Budget alerts
-  const budgetAlerts = generateBudgetAlerts(subOrgs);
-  notifications.push(...budgetAlerts);
+  // Only show critical budget alerts
+  const criticalBudgetAlerts = generateCriticalBudgetAlerts(subOrgs);
+  notifications.push(...criticalBudgetAlerts);
 
-  // Recent transaction uploads
+  // Recent transaction uploads (only last 4 hours)
+  const fourHoursAgo = Date.now() - (4 * 60 * 60 * 1000);
   const recentTransactionUploads = transactions.filter(t => {
     const uploadTime = t.createdAt.getTime();
-    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    return uploadTime > oneDayAgo;
+    return uploadTime > fourHoursAgo;
   });
 
   if (recentTransactionUploads.length > 0) {
@@ -206,7 +207,7 @@ const generatePurchaserNotifications = (pos: PurchaseOrder[], transactions: Tran
   const notifications: Notification[] = [];
   
   // Approved POs ready for purchase
-  const readyForPurchase = pos.filter(po => po.status === 'approved');
+  const readyForPurchase = pos.filter(po => po.status === 'approved' || po.status === 'pending_purchase');
   if (readyForPurchase.length > 0) {
     const totalValue = readyForPurchase.reduce((sum, po) => sum + po.totalAmount, 0);
     notifications.push({
@@ -216,38 +217,38 @@ const generatePurchaserNotifications = (pos: PurchaseOrder[], transactions: Tran
       message: `${readyForPurchase.length} PO${readyForPurchase.length > 1 ? 's' : ''} ready for purchase (Total: $${totalValue.toLocaleString()})`,
       timestamp: new Date(),
       isRead: false,
-      priority: 'high',
+      priority: readyForPurchase.length > 5 ? 'high' : 'medium',
       actionUrl: '/pending-purchase',
       icon: 'ShoppingCart'
     });
   }
 
-  // Recently purchased POs
+  // Recently purchased POs that need receipts (only last 24 hours)
+  const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
   const recentlyPurchased = pos.filter(po => {
     if (po.status !== 'purchased' || !po.purchasedAt) return false;
     const purchaseTime = po.purchasedAt.seconds * 1000;
-    const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
-    return purchaseTime > threeDaysAgo;
+    return purchaseTime > oneDayAgo;
   });
 
-  recentlyPurchased.forEach(po => {
+  if (recentlyPurchased.length > 0) {
     notifications.push({
-      id: `purchased-${po.id}`,
+      id: 'recent-purchases',
       type: 'po_status',
-      title: 'PO Purchased',
-      message: `PO #${po.id.slice(-6).toUpperCase()} completed - Don't forget to upload receipts`,
-      timestamp: new Date(po.purchasedAt!.seconds * 1000),
+      title: 'Upload Receipts',
+      message: `${recentlyPurchased.length} recently purchased PO${recentlyPurchased.length > 1 ? 's' : ''} - upload receipts`,
+      timestamp: new Date(),
       isRead: false,
       priority: 'medium',
       actionUrl: '/transactions',
       icon: 'Receipt'
     });
-  });
+  }
 
   return notifications;
 };
 
-const generateBudgetAlerts = (subOrgs: SubOrganization[]): Notification[] => {
+const generateCriticalBudgetAlerts = (subOrgs: SubOrganization[]): Notification[] => {
   const notifications: Notification[] = [];
   
   subOrgs.forEach(org => {
@@ -265,7 +266,7 @@ const generateBudgetAlerts = (subOrgs: SubOrganization[]): Notification[] => {
         actionUrl: '/budget-management',
         icon: 'AlertTriangle'
       });
-    } else if (utilization > 90) {
+    } else if (utilization > 95) {
       notifications.push({
         id: `budget-critical-${org.id}`,
         type: 'budget_alert',
@@ -276,18 +277,6 @@ const generateBudgetAlerts = (subOrgs: SubOrganization[]): Notification[] => {
         priority: 'high',
         actionUrl: '/budget-management',
         icon: 'AlertTriangle'
-      });
-    } else if (utilization > 75) {
-      notifications.push({
-        id: `budget-warning-${org.id}`,
-        type: 'budget_alert',
-        title: 'Budget Warning',
-        message: `${org.name} has used ${utilization.toFixed(0)}% of budget`,
-        timestamp: new Date(),
-        isRead: false,
-        priority: 'medium',
-        actionUrl: '/budget-management',
-        icon: 'AlertCircle'
       });
     }
   });
