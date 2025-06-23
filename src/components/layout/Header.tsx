@@ -1,7 +1,8 @@
 import React from 'react';
-import { LogOut, User, Bell } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
+import { NotificationDropdown } from './NotificationDropdown';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 
@@ -34,9 +35,7 @@ export const Header: React.FC = () => {
           
           {/* Right side - User controls pushed to the right */}
           <div className="flex items-center space-x-4">
-            <button className="p-2 text-gray-400 hover:text-gray-300 rounded-lg hover:bg-gray-700 transition-colors">
-              <Bell className="h-5 w-5" />
-            </button>
+            <NotificationDropdown />
             
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
