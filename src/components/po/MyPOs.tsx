@@ -8,9 +8,11 @@ import { getPOsByUser, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
+import { useNavigate } from 'react-router-dom';
 
 export const MyPOs: React.FC = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
@@ -50,6 +52,10 @@ export const MyPOs: React.FC = () => {
     } finally {
       setDeleteLoading(null);
     }
+  };
+
+  const handleEditPO = (poId: string) => {
+    navigate(`/create-po?edit=${poId}`);
   };
 
   const getStatusBadge = (status: PurchaseOrder['status']) => {
@@ -100,7 +106,7 @@ export const MyPOs: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-100">My Purchase Orders</h1>
-        <Button onClick={() => window.location.href = '/create-po'}>
+        <Button onClick={() => navigate('/create-po')}>
           Create New PO
         </Button>
       </div>
@@ -195,7 +201,11 @@ export const MyPOs: React.FC = () => {
                     View
                   </Button>
                   {po.status === 'draft' && (
-                    <Button variant="outline" size="sm">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => handleEditPO(po.id)}
+                    >
                       <Edit className="h-4 w-4 mr-1" />
                       Edit
                     </Button>

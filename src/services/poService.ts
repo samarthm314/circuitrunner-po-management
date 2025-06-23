@@ -23,17 +23,32 @@ export const createPO = async (poData: {
   lineItems: LineItem[];
   totalAmount: number;
   overBudgetJustification?: string;
+  status?: 'draft' | 'pending_approval';
 }) => {
   try {
     const docRef = await addDoc(collection(db, 'purchaseOrders'), {
       ...poData,
-      status: 'pending_approval',
+      status: poData.status || 'pending_approval',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
     return docRef.id;
   } catch (error) {
     console.error('Error creating PO:', error);
+    throw error;
+  }
+};
+
+export const updatePO = async (poId: string, updates: Partial<PurchaseOrder>) => {
+  try {
+    const updateData: any = {
+      ...updates,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(doc(db, 'purchaseOrders', poId), updateData);
+  } catch (error) {
+    console.error('Error updating PO:', error);
     throw error;
   }
 };
@@ -169,5 +184,24 @@ export const getAllPOs = async () => {
   } catch (error) {
     console.error('Error fetching all POs:', error);
     throw error;
+  }
+};
+
+export const getPOById = async (poId: string): Promise<PurchaseOrder | null> => {
+  try {
+    const docRef = doc(db, 'purchaseOrders', poId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data()
+      } as PurchaseOrder;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching PO by ID:', error);
+    return null;
   }
 };

@@ -1,26 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Save } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { LineItem, SubOrganization } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { createPO } from '../../services/poService';
+import { createPO, updatePO, getPOById } from '../../services/poService';
 import { getSubOrganizations } from '../../services/subOrgService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 export const CreatePO: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  
   const [subOrganizations, setSubOrganizations] = useState<SubOrganization[]>([]);
   const [selectedSubOrg, setSelectedSubOrg] = useState<string>('');
   const [specialRequest, setSpecialRequest] = useState('');
   const [overBudgetJustification, setOverBudgetJustification] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingOrgs, setLoadingOrgs] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingPOId, setEditingPOId] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', totalPrice: 0 }
   ]);
+  
   // Track the raw input values for price fields
   const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({
     '1': ''
@@ -40,6 +46,45 @@ export const CreatePO: React.FC = () => {
 
     fetchSubOrganizations();
   }, []);
+
+  useEffect(() => {
+    // Check if we're editing an existing PO
+    if (editId) {
+      loadPOForEditing(editId);
+    }
+  }, [editId]);
+
+  const loadPOForEditing = async (poId: string) => {
+    try {
+      setLoading(true);
+      const po = await getPOById(poId);
+      
+      if (po && po.status === 'draft') {
+        setIsEditing(true);
+        setEditingPOId(poId);
+        setSelectedSubOrg(po.subOrgId);
+        setSpecialRequest(po.specialRequest || '');
+        setOverBudgetJustification(po.overBudgetJustification || '');
+        setLineItems(po.lineItems);
+        
+        // Set up price inputs for existing line items
+        const newPriceInputs: { [key: string]: string } = {};
+        po.lineItems.forEach(item => {
+          newPriceInputs[item.id] = item.unitPrice > 0 ? item.unitPrice.toFixed(2) : '';
+        });
+        setPriceInputs(newPriceInputs);
+      } else {
+        alert('PO not found or cannot be edited');
+        navigate('/my-pos');
+      }
+    } catch (error) {
+      console.error('Error loading PO for editing:', error);
+      alert('Error loading PO for editing');
+      navigate('/my-pos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addLineItem = () => {
     const newId = Date.now().toString();
@@ -136,39 +181,48 @@ export const CreatePO: React.FC = () => {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!currentUser || !userProfile || !selectedOrg) return;
-
-    // Validate line items
-    const validLineItems = lineItems.filter(item => 
-      item.vendor.trim() && item.itemName.trim() && item.quantity > 0 && item.unitPrice > 0
-    );
-
-    if (validLineItems.length === 0) {
-      alert('Please add at least one valid line item');
-      return;
+  const validateForm = (isDraft: boolean = false) => {
+    if (!selectedOrg) {
+      alert('Please select a sub-organization');
+      return false;
     }
 
-    if (isOverBudget && !overBudgetJustification.trim()) {
-      alert('Please provide justification for exceeding the budget');
-      return;
+    if (!isDraft) {
+      // For submission, require at least one valid line item
+      const validLineItems = lineItems.filter(item => 
+        item.vendor.trim() && item.itemName.trim() && item.quantity > 0 && item.unitPrice > 0
+      );
+
+      if (validLineItems.length === 0) {
+        alert('Please add at least one valid line item');
+        return false;
+      }
+
+      if (isOverBudget && !overBudgetJustification.trim()) {
+        alert('Please provide justification for exceeding the budget');
+        return false;
+      }
     }
+
+    return true;
+  };
+
+  const handleSaveDraft = async () => {
+    if (!currentUser || !userProfile) return;
+
+    if (!validateForm(true)) return;
 
     setLoading(true);
 
     try {
-      // Sort line items alphabetically by vendor before submitting
-      const sortedLineItems = sortLineItemsByVendor(validLineItems);
-
       const poData: any = {
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
         subOrgId: selectedSubOrg,
-        subOrgName: selectedOrg.name,
-        lineItems: sortedLineItems, // Use sorted line items
+        subOrgName: selectedOrg!.name,
+        lineItems: lineItems, // Don't filter or sort for drafts
         totalAmount,
+        status: 'draft'
       };
 
       // Only add optional fields if they have values
@@ -180,9 +234,72 @@ export const CreatePO: React.FC = () => {
         poData.overBudgetJustification = overBudgetJustification.trim();
       }
 
-      await createPO(poData);
+      if (isEditing && editingPOId) {
+        // Update existing draft
+        await updatePO(editingPOId, poData);
+        alert('Draft updated successfully!');
+      } else {
+        // Create new draft
+        await createPO(poData);
+        alert('Draft saved successfully!');
+      }
 
-      alert('Purchase Order submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+      navigate('/my-pos');
+    } catch (error) {
+      console.error('Error saving draft:', error);
+      alert('Error saving draft. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser || !userProfile || !selectedOrg) return;
+
+    if (!validateForm(false)) return;
+
+    setLoading(true);
+
+    try {
+      // Validate line items for submission
+      const validLineItems = lineItems.filter(item => 
+        item.vendor.trim() && item.itemName.trim() && item.quantity > 0 && item.unitPrice > 0
+      );
+
+      // Sort line items alphabetically by vendor before submitting
+      const sortedLineItems = sortLineItemsByVendor(validLineItems);
+
+      const poData: any = {
+        creatorId: currentUser.uid,
+        creatorName: userProfile.displayName,
+        subOrgId: selectedSubOrg,
+        subOrgName: selectedOrg.name,
+        lineItems: sortedLineItems, // Use sorted line items
+        totalAmount,
+        status: 'pending_approval'
+      };
+
+      // Only add optional fields if they have values
+      if (specialRequest.trim()) {
+        poData.specialRequest = specialRequest.trim();
+      }
+
+      if (isOverBudget && overBudgetJustification.trim()) {
+        poData.overBudgetJustification = overBudgetJustification.trim();
+      }
+
+      if (isEditing && editingPOId) {
+        // Update existing draft and submit
+        await updatePO(editingPOId, poData);
+        alert('Purchase Order updated and submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+      } else {
+        // Create new PO
+        await createPO(poData);
+        alert('Purchase Order submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+      }
+
       navigate('/my-pos');
     } catch (error) {
       console.error('Error submitting PO:', error);
@@ -202,7 +319,16 @@ export const CreatePO: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-100">Create Purchase Order</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-100">
+          {isEditing ? 'Edit Purchase Order' : 'Create Purchase Order'}
+        </h1>
+        {isEditing && (
+          <Badge variant="warning" size="md">
+            Editing Draft
+          </Badge>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Sub-Organization Selection */}
@@ -275,7 +401,6 @@ export const CreatePO: React.FC = () => {
                     onChange={(e) => updateLineItem(item.id, 'vendor', e.target.value)}
                     className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                     placeholder="Vendor name"
-                    required
                   />
                 </div>
                 <div className="col-span-12 sm:col-span-3">
@@ -286,7 +411,6 @@ export const CreatePO: React.FC = () => {
                     onChange={(e) => updateLineItem(item.id, 'itemName', e.target.value)}
                     className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                     placeholder="Item description"
-                    required
                   />
                 </div>
                 <div className="col-span-12 sm:col-span-2">
@@ -307,7 +431,6 @@ export const CreatePO: React.FC = () => {
                     value={item.quantity}
                     onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
                     className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                    required
                   />
                 </div>
                 <div className="col-span-6 sm:col-span-2">
@@ -322,7 +445,6 @@ export const CreatePO: React.FC = () => {
                       onBlur={() => handlePriceBlur(item.id)}
                       className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
-                      required
                     />
                   </div>
                 </div>
@@ -424,11 +546,18 @@ export const CreatePO: React.FC = () => {
 
         {/* Submit Buttons */}
         <div className="flex justify-end space-x-4">
-          <Button type="button" variant="outline" disabled={loading}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={handleSaveDraft}
+            disabled={loading}
+            loading={loading}
+          >
+            <Save className="h-4 w-4 mr-2" />
             Save as Draft
           </Button>
           <Button type="submit" loading={loading}>
-            Submit for Approval
+            {isEditing ? 'Update & Submit for Approval' : 'Submit for Approval'}
           </Button>
         </div>
       </form>
