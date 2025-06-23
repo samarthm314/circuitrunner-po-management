@@ -14,6 +14,7 @@ import {
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
 import { Transaction } from '../types';
+import { updateSubOrgBudget, getSubOrganizations } from './subOrgService';
 
 export const createTransaction = async (transactionData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
   try {
@@ -43,6 +44,9 @@ export const updateTransaction = async (transactionId: string, updates: Partial<
     cleanUpdates.updatedAt = serverTimestamp();
 
     await updateDoc(doc(db, 'transactions', transactionId), cleanUpdates);
+    
+    // After updating transaction, recalculate budgets
+    await recalculateAllBudgets();
   } catch (error) {
     console.error('Error updating transaction:', error);
     throw error;
@@ -52,6 +56,9 @@ export const updateTransaction = async (transactionId: string, updates: Partial<
 export const deleteTransaction = async (transactionId: string) => {
   try {
     await deleteDoc(doc(db, 'transactions', transactionId));
+    
+    // After deleting transaction, recalculate budgets
+    await recalculateAllBudgets();
   } catch (error) {
     console.error('Error deleting transaction:', error);
     throw error;
@@ -183,5 +190,52 @@ export const processExcelData = async (data: any[]): Promise<{ processed: number
     }
   }
 
+  // After processing all transactions, recalculate budgets
+  if (processed > 0) {
+    await recalculateAllBudgets();
+  }
+
   return { processed, skipped, errors };
+};
+
+// New function to recalculate all budget spent amounts
+export const recalculateAllBudgets = async () => {
+  try {
+    console.log('Starting budget recalculation...');
+    
+    // Get all transactions and sub-organizations
+    const [allTransactions, allSubOrgs] = await Promise.all([
+      getAllTransactions(),
+      getSubOrganizations()
+    ]);
+
+    // Calculate spent amounts for each sub-org
+    const spentBySubOrg: { [key: string]: number } = {};
+    
+    allTransactions.forEach(transaction => {
+      if (transaction.subOrgId) {
+        spentBySubOrg[transaction.subOrgId] = (spentBySubOrg[transaction.subOrgId] || 0) + transaction.debitAmount;
+      }
+    });
+
+    console.log('Calculated spending by sub-org:', spentBySubOrg);
+
+    // Update each sub-org's budget spent
+    const updatePromises = allSubOrgs.map(async (subOrg) => {
+      const newSpent = spentBySubOrg[subOrg.id] || 0;
+      console.log(`Updating ${subOrg.name}: spent ${newSpent} (was ${subOrg.budgetSpent})`);
+      
+      // Only update if the value has changed to avoid unnecessary writes
+      if (Math.abs(newSpent - subOrg.budgetSpent) > 0.01) {
+        await updateSubOrgBudget(subOrg.id, subOrg.budgetAllocated, newSpent);
+      }
+    });
+
+    await Promise.all(updatePromises);
+    console.log('Budget recalculation completed successfully');
+    
+  } catch (error) {
+    console.error('Error recalculating budgets:', error);
+    throw error;
+  }
 };

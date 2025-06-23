@@ -21,9 +21,10 @@ import {
   deleteTransaction, 
   uploadReceiptFile, 
   deleteReceiptFile,
-  processExcelData 
+  processExcelData,
+  recalculateAllBudgets
 } from '../../services/transactionService';
-import { getSubOrganizations, updateSubOrgBudget } from '../../services/subOrgService';
+import { getSubOrganizations } from '../../services/subOrgService';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
@@ -179,9 +180,6 @@ export const Transactions: React.FC = () => {
       }
 
       await updateTransaction(transactionId, updateData);
-
-      // Recalculate budget spent for all sub-organizations
-      await recalculateBudgets();
       
       await fetchData(); // Refresh data to show updated budgets
       setEditingId(null);
@@ -189,37 +187,6 @@ export const Transactions: React.FC = () => {
     } catch (error) {
       console.error('Error updating transaction:', error);
       alert('Error updating transaction. Please try again.');
-    }
-  };
-
-  const recalculateBudgets = async () => {
-    try {
-      // Get fresh transaction data to ensure accuracy
-      const currentTransactions = await getAllTransactions();
-      
-      // Calculate spent amounts for each sub-org based on current transactions
-      const spentBySubOrg: { [key: string]: number } = {};
-      
-      currentTransactions.forEach(transaction => {
-        if (transaction.subOrgId) {
-          spentBySubOrg[transaction.subOrgId] = (spentBySubOrg[transaction.subOrgId] || 0) + transaction.debitAmount;
-        }
-      });
-
-      // Update each sub-org's budget spent
-      const updatePromises = subOrgs.map(async (subOrg) => {
-        const newSpent = spentBySubOrg[subOrg.id] || 0;
-        // Always update to ensure consistency, even if the value appears the same
-        await updateSubOrgBudget(subOrg.id, subOrg.budgetAllocated, newSpent);
-        return { ...subOrg, budgetSpent: newSpent };
-      });
-
-      await Promise.all(updatePromises);
-      
-      console.log('Budget recalculation completed:', spentBySubOrg);
-    } catch (error) {
-      console.error('Error recalculating budgets:', error);
-      // Don't throw the error to prevent blocking the transaction update
     }
   };
 
@@ -273,11 +240,26 @@ export const Transactions: React.FC = () => {
 
     try {
       await deleteTransaction(transactionId);
-      await recalculateBudgets();
       await fetchData();
     } catch (error) {
       console.error('Error deleting transaction:', error);
       alert('Error deleting transaction. Please try again.');
+    }
+  };
+
+  const handleRecalculateBudgets = async () => {
+    if (!confirm('This will recalculate all budget spent amounts based on current transactions. Continue?')) return;
+
+    try {
+      setLoading(true);
+      await recalculateAllBudgets();
+      await fetchData();
+      alert('Budget recalculation completed successfully!');
+    } catch (error) {
+      console.error('Error recalculating budgets:', error);
+      alert('Error recalculating budgets. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -323,6 +305,11 @@ export const Transactions: React.FC = () => {
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
+          </Button>
+
+          <Button variant="outline" onClick={handleRecalculateBudgets}>
+            <Building className="h-4 w-4 mr-2" />
+            Recalculate Budgets
           </Button>
         </div>
       </div>
@@ -567,6 +554,7 @@ export const Transactions: React.FC = () => {
             <li>Only transactions with positive debit amounts are imported</li>
             <li>Duplicate descriptions are automatically skipped</li>
             <li>After import, assign transactions to sub-organizations for budget tracking</li>
+            <li>Budget spent amounts are automatically recalculated when transactions are allocated</li>
           </ul>
         </div>
       </Card>
