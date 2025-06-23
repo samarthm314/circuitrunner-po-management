@@ -546,7 +546,7 @@ export const CreatePO: React.FC = () => {
                           href={item.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center"
+                          className="px-4 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center"
                           title="Open link"
                         >
                           <ExternalLink className="h-4 w-4 text-gray-300" />
