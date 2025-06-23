@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Sub-organizations - read for authenticated users, write for admins
+    match /subOrganizations/{subOrgId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Purchase Orders - complex rules based on role and status
+    match /purchaseOrders/{poId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['director', 'admin']);
+      allow update: if request.auth != null && (
+        // Creator can update their own POs (both existing and new data should match)
+        ((resource.data.creatorId == request.auth.uid || request.resource.data.creatorId == request.auth.uid) && 
+         (resource.data.status in ['draft', 'declined'] || request.resource.data.status in ['draft', 'pending_approval'])) ||
+        // Admins can approve/decline
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        // Purchasers can mark as purchased
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'purchaser' && 
+         resource.data.status == 'approved')
+      );
+      // Allow users to delete their own POs
+      allow delete: if request.auth != null;
+    }
+    
+    // Transactions - purchasers and admins only
+    match /transactions/{transactionId} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['purchaser', 'admin'];
+    }
+    
+    // Audit logs - read only for authenticated users
+    match /auditLogs/{logId} {
+      allow read: if request.auth != null;
+      allow write: if false; // Only server-side writes
+    }
+  }
+}
