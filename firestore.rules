@@ -26,7 +26,7 @@ service cloud.firestore {
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
         // Purchasers can mark as purchased
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'purchaser' && 
-         resource.data.status == 'approved')
+         resource.data.status in ['approved', 'pending_purchase'])
       );
       // Allow users to delete their own POs
       allow delete: if request.auth != null;
