@@ -106,6 +106,11 @@ export const AllPOs: React.FC = () => {
     setSelectedPO(null);
   };
 
+  const handlePOUpdated = () => {
+    // Refresh the PO list when a PO is updated from the modal
+    fetchAllPOs();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -243,6 +248,7 @@ export const AllPOs: React.FC = () => {
           po={selectedPO}
           isOpen={isModalOpen}
           onClose={closeModal}
+          onPOUpdated={handlePOUpdated}
         />
       )}
     </div>

@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ExternalLink, Calendar, User, Building, DollarSign, Download } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
+import { updatePOStatus } from '../../services/poService';
 import { format } from 'date-fns';
 import * as XLSX from 'xlsx';
 
@@ -11,12 +12,19 @@ interface PODetailsModalProps {
   po: PurchaseOrder;
   isOpen: boolean;
   onClose: () => void;
+  onPOUpdated?: () => void; // Callback to refresh PO data
 }
 
-export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onClose }) => {
+export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onClose, onPOUpdated }) => {
   const { userProfile } = useAuth();
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
   const [downloadLoading, setDownloadLoading] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Reset checked items when PO changes
+  useEffect(() => {
+    setCheckedItems({});
+  }, [po.id]);
 
   if (!isOpen) return null;
 
@@ -46,11 +54,41 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
     );
   };
 
-  const handleItemCheck = (itemIndex: number) => {
+  const handleItemCheck = async (itemIndex: number) => {
+    const newCheckedState = !checkedItems[itemIndex];
+    
     setCheckedItems(prev => ({
       ...prev,
-      [itemIndex]: !prev[itemIndex]
+      [itemIndex]: newCheckedState
     }));
+
+    // If this is the first item being checked and PO is still "approved", update to "pending_purchase"
+    const anyItemsChecked = Object.values(checkedItems).some(Boolean) || newCheckedState;
+    
+    if (anyItemsChecked && po.status === 'approved' && userProfile?.role === 'purchaser') {
+      setUpdatingStatus(true);
+      try {
+        await updatePOStatus(po.id, 'pending_purchase', 'Purchaser has started working on this PO');
+        
+        // Call the callback to refresh the PO data in parent components
+        if (onPOUpdated) {
+          onPOUpdated();
+        }
+        
+        // Show a brief success message
+        console.log('PO status updated to pending_purchase');
+      } catch (error) {
+        console.error('Error updating PO status:', error);
+        // Revert the checkbox state if the status update failed
+        setCheckedItems(prev => ({
+          ...prev,
+          [itemIndex]: !newCheckedState
+        }));
+        alert('Error updating PO status. Please try again.');
+      } finally {
+        setUpdatingStatus(false);
+      }
+    }
   };
 
   const downloadSummary = async () => {
@@ -145,7 +183,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
   };
 
   const isPurchaser = userProfile?.role === 'purchaser';
-  const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'purchased');
+  const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'pending_purchase' || po.status === 'purchased');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -157,6 +195,12 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               PO #{po.id.slice(-6).toUpperCase()}
             </h2>
             {getStatusBadge(po.status)}
+            {updatingStatus && (
+              <div className="flex items-center space-x-2 text-yellow-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
+                <span className="text-sm">Updating status...</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -246,7 +290,11 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               <h3 className="font-medium text-green-300 mb-2">Purchaser Instructions</h3>
               <p className="text-green-200 text-sm">
                 Check off items as you purchase them. Items with checkmarks will show with strikethrough text.
-                This helps you track your progress while shopping.
+                {po.status === 'approved' && (
+                  <span className="block mt-1 font-medium text-green-300">
+                    💡 Checking your first item will automatically update this PO status to "Pending Purchase"
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -283,7 +331,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
                               type="checkbox"
                               checked={isChecked}
                               onChange={() => handleItemCheck(index)}
-                              className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
+                              disabled={updatingStatus}
+                              className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2 disabled:opacity-50"
                             />
                           </td>
                         )}

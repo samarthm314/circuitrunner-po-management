@@ -22,8 +22,20 @@ export const PendingPurchase: React.FC = () => {
 
   const fetchPendingPurchasePOs = async () => {
     try {
-      const pendingPOs = await getPOsByStatus('approved');
-      setPOs(pendingPOs);
+      // Get both approved and pending_purchase POs
+      const [approvedPOs, pendingPurchasePOs] = await Promise.all([
+        getPOsByStatus('approved'),
+        getPOsByStatus('pending_purchase')
+      ]);
+      
+      // Combine and sort by updated date
+      const allPOs = [...approvedPOs, ...pendingPurchasePOs].sort((a, b) => {
+        const aTime = a.updatedAt?.seconds || a.createdAt?.seconds || 0;
+        const bTime = b.updatedAt?.seconds || b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+      
+      setPOs(allPOs);
     } catch (error) {
       console.error('Error fetching pending purchase POs:', error);
     } finally {
@@ -72,8 +84,22 @@ export const PendingPurchase: React.FC = () => {
     setSelectedPO(null);
   };
 
+  const handlePOUpdated = () => {
+    // Refresh the PO list when a PO is updated from the modal
+    fetchPendingPurchasePOs();
+  };
+
   const getTotalValue = () => {
     return pos.reduce((sum, po) => sum + po.totalAmount, 0);
+  };
+
+  const getStatusBadge = (status: PurchaseOrder['status']) => {
+    if (status === 'approved') {
+      return <Badge variant="info">Ready for Purchase</Badge>;
+    } else if (status === 'pending_purchase') {
+      return <Badge variant="warning">In Progress</Badge>;
+    }
+    return <Badge variant="info">{status}</Badge>;
   };
 
   if (loading) {
@@ -118,7 +144,7 @@ export const PendingPurchase: React.FC = () => {
                       <h3 className="text-xl font-semibold text-gray-100">
                         PO #{po.id.slice(-6).toUpperCase()}
                       </h3>
-                      <Badge variant="info">Ready for Purchase</Badge>
+                      {getStatusBadge(po.status)}
                       <Button
                         variant="outline"
                         size="sm"
@@ -151,8 +177,11 @@ export const PendingPurchase: React.FC = () => {
                         <span className="text-green-400 font-bold ml-1">${po.totalAmount.toFixed(2)}</span>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-200">Approved:</span> {
-                          po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
+                        <span className="font-medium text-gray-200">
+                          {po.status === 'approved' ? 'Approved:' : 'Last Updated:'}
+                        </span> {
+                          po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 
+                          po.updatedAt ? format(new Date(po.updatedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
                         }
                       </div>
                     </div>
@@ -168,6 +197,16 @@ export const PendingPurchase: React.FC = () => {
                       <div className="bg-gray-700 border border-gray-600 p-3 rounded-lg mb-4">
                         <span className="text-sm font-medium text-gray-200">Admin Comments:</span>
                         <p className="text-sm text-gray-300 mt-1">{po.adminComments}</p>
+                      </div>
+                    )}
+
+                    {/* Status indicator for pending_purchase */}
+                    {po.status === 'pending_purchase' && (
+                      <div className="bg-yellow-900/30 border border-yellow-700 p-3 rounded-lg mb-4">
+                        <span className="text-sm font-medium text-yellow-300">🛒 Purchase In Progress:</span>
+                        <p className="text-sm text-yellow-200 mt-1">
+                          This PO is currently being worked on. Check the details to see purchase progress.
+                        </p>
                       </div>
                     )}
                   </div>
@@ -212,7 +251,10 @@ export const PendingPurchase: React.FC = () => {
                       <div className="space-y-3">
                         <div>
                           <p className="text-sm text-gray-300 mb-2">
-                            Once you've purchased all items, mark this PO as complete.
+                            {po.status === 'approved' 
+                              ? 'Click "View Details" to start purchasing and track progress.'
+                              : 'Purchase is in progress. View details to see current status.'
+                            }
                           </p>
                           <p className="text-xs text-gray-400 mb-3">
                             Receipt tracking will be handled in the Transactions page.
@@ -265,15 +307,15 @@ export const PendingPurchase: React.FC = () => {
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
-            <p>Use the provided vendor links to purchase items or find alternative sources</p>
+            <p>Click "View Details" and check off items as you purchase them (this will update the PO status to "Pending Purchase")</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
-            <p>Complete the purchase from the approved vendors</p>
+            <p>Use the provided vendor links to purchase items or find alternative sources</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">4</span>
-            <p>Mark the PO as "Purchased" to complete the process</p>
+            <p>Mark the PO as "Purchased" when all items are complete</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">5</span>
@@ -288,6 +330,7 @@ export const PendingPurchase: React.FC = () => {
           po={selectedPO}
           isOpen={isModalOpen}
           onClose={closeModal}
+          onPOUpdated={handlePOUpdated}
         />
       )}
     </div>

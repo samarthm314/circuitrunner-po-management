@@ -94,6 +94,11 @@ export const MyPOs: React.FC = () => {
     setSelectedPO(null);
   };
 
+  const handlePOUpdated = () => {
+    // Refresh the PO list when a PO is updated from the modal
+    fetchPOs();
+  };
+
   const canEditPO = (po: PurchaseOrder) => {
     return po.status === 'draft' || po.status === 'declined';
   };
@@ -266,6 +271,7 @@ export const MyPOs: React.FC = () => {
           po={selectedPO}
           isOpen={isModalOpen}
           onClose={closeModal}
+          onPOUpdated={handlePOUpdated}
         />
       )}
     </div>
