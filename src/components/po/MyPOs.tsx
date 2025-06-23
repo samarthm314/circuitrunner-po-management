@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ExternalLink, Eye, Edit, Trash2 } from 'lucide-react';
+import { ExternalLink, Eye, Edit, Trash2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPOsByUser, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
@@ -94,6 +94,21 @@ export const MyPOs: React.FC = () => {
     setSelectedPO(null);
   };
 
+  const canEditPO = (po: PurchaseOrder) => {
+    return po.status === 'draft' || po.status === 'declined';
+  };
+
+  const getEditButtonText = (po: PurchaseOrder) => {
+    if (po.status === 'draft') return 'Edit';
+    if (po.status === 'declined') return 'Edit & Resubmit';
+    return 'Edit';
+  };
+
+  const getEditButtonIcon = (po: PurchaseOrder) => {
+    if (po.status === 'declined') return RefreshCw;
+    return Edit;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -120,110 +135,132 @@ export const MyPOs: React.FC = () => {
         </Card>
       ) : (
         <div className="space-y-4">
-          {pos.map((po) => (
-            <Card key={po.id}>
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-100">
-                      PO #{po.id.slice(-6).toUpperCase()}
-                    </h3>
-                    {getStatusBadge(po.status)}
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
-                    <div>
-                      <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+          {pos.map((po) => {
+            const EditIcon = getEditButtonIcon(po);
+            
+            return (
+              <Card key={po.id}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <h3 className="text-lg font-semibold text-gray-100">
+                        PO #{po.id.slice(-6).toUpperCase()}
+                      </h3>
+                      {getStatusBadge(po.status)}
                     </div>
-                    <div>
-                      <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
+                      <div>
+                        <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-200">Created:</span> {
+                          po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
+                        }
+                      </div>
                     </div>
-                    <div>
-                      <span className="font-medium text-gray-200">Created:</span> {
-                        po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
-                      }
-                    </div>
-                  </div>
 
-                  {po.specialRequest && (
-                    <div className="mt-3">
-                      <span className="text-sm font-medium text-gray-200">Special Request:</span>
-                      <p className="text-sm text-gray-300 mt-1">{po.specialRequest}</p>
-                    </div>
-                  )}
+                    {po.specialRequest && (
+                      <div className="mt-3">
+                        <span className="text-sm font-medium text-gray-200">Special Request:</span>
+                        <p className="text-sm text-gray-300 mt-1">{po.specialRequest}</p>
+                      </div>
+                    )}
 
-                  {po.adminComments && (
-                    <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg">
-                      <span className="text-sm font-medium text-yellow-300">Admin Comments:</span>
-                      <p className="text-sm text-yellow-200 mt-1">{po.adminComments}</p>
-                    </div>
-                  )}
+                    {po.adminComments && (
+                      <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg">
+                        <span className="text-sm font-medium text-yellow-300">Admin Comments:</span>
+                        <p className="text-sm text-yellow-200 mt-1">{po.adminComments}</p>
+                      </div>
+                    )}
 
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-200 mb-2">Line Items:</h4>
-                    <div className="space-y-2">
-                      {po.lineItems.map((item, index) => (
-                        <div key={index} className="flex justify-between items-center text-sm bg-gray-700 p-2 rounded">
-                          <div className="flex-1">
-                            <span className="font-medium text-gray-100">{item.itemName}</span>
-                            <span className="text-gray-400 ml-2">from {item.vendor}</span>
-                            {item.sku && (
-                              <span className="text-gray-400 ml-2">SKU: {item.sku}</span>
-                            )}
+                    {/* Show decline reason prominently for declined POs */}
+                    {po.status === 'declined' && po.adminComments && (
+                      <div className="mt-3 p-4 bg-red-900/30 border border-red-700 rounded-lg">
+                        <div className="flex items-start space-x-2">
+                          <div className="flex-shrink-0">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-300">{item.quantity} × ${item.unitPrice.toFixed(2)}</span>
-                            <span className="font-medium text-gray-100">${item.totalPrice.toFixed(2)}</span>
-                            {item.link && (
-                              <a
-                                href={item.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-green-400 hover:text-green-300"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                            )}
+                          <div>
+                            <span className="text-sm font-medium text-red-300">Reason for Decline:</span>
+                            <p className="text-sm text-red-200 mt-1">{po.adminComments}</p>
+                            <p className="text-xs text-red-300 mt-2 italic">
+                              You can edit this PO to address the concerns and resubmit for approval.
+                            </p>
                           </div>
                         </div>
-                      ))}
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-200 mb-2">Line Items:</h4>
+                      <div className="space-y-2">
+                        {po.lineItems.map((item, index) => (
+                          <div key={index} className="flex justify-between items-center text-sm bg-gray-700 p-2 rounded">
+                            <div className="flex-1">
+                              <span className="font-medium text-gray-100">{item.itemName}</span>
+                              <span className="text-gray-400 ml-2">from {item.vendor}</span>
+                              {item.sku && (
+                                <span className="text-gray-400 ml-2">SKU: {item.sku}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-300">{item.quantity} × ${item.unitPrice.toFixed(2)}</span>
+                              <span className="font-medium text-gray-100">${item.totalPrice.toFixed(2)}</span>
+                              {item.link && (
+                                <a
+                                  href={item.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-green-400 hover:text-green-300"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex space-x-2 ml-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleViewDetails(po)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    View
-                  </Button>
-                  {po.status === 'draft' && (
+                  <div className="flex space-x-2 ml-4">
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => handleEditPO(po.id)}
+                      onClick={() => handleViewDetails(po)}
                     >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Edit
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
                     </Button>
-                  )}
-                  <Button 
-                    variant="danger" 
-                    size="sm"
-                    onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
-                    loading={deleteLoading === po.id}
-                    disabled={deleteLoading !== null}
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
+                    {canEditPO(po) && (
+                      <Button 
+                        variant={po.status === 'declined' ? 'primary' : 'outline'}
+                        size="sm"
+                        onClick={() => handleEditPO(po.id)}
+                      >
+                        <EditIcon className="h-4 w-4 mr-1" />
+                        {getEditButtonText(po)}
+                      </Button>
+                    )}
+                    <Button 
+                      variant="danger" 
+                      size="sm"
+                      onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                      loading={deleteLoading === po.id}
+                      disabled={deleteLoading !== null}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
 

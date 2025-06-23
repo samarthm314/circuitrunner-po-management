@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, ExternalLink, Save } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Save, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -23,6 +23,7 @@ export const CreatePO: React.FC = () => {
   const [loadingOrgs, setLoadingOrgs] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editingPOId, setEditingPOId] = useState<string | null>(null);
+  const [originalPOStatus, setOriginalPOStatus] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', totalPrice: 0 }
   ]);
@@ -59,9 +60,10 @@ export const CreatePO: React.FC = () => {
       setLoading(true);
       const po = await getPOById(poId);
       
-      if (po && po.status === 'draft') {
+      if (po && (po.status === 'draft' || po.status === 'declined')) {
         setIsEditing(true);
         setEditingPOId(poId);
+        setOriginalPOStatus(po.status);
         setSelectedSubOrg(po.subOrgId);
         setSpecialRequest(po.specialRequest || '');
         setOverBudgetJustification(po.overBudgetJustification || '');
@@ -234,6 +236,11 @@ export const CreatePO: React.FC = () => {
         poData.overBudgetJustification = overBudgetJustification.trim();
       }
 
+      // Clear admin comments when saving as draft (especially for declined POs)
+      if (originalPOStatus === 'declined') {
+        poData.adminComments = null;
+      }
+
       if (isEditing && editingPOId) {
         // Update existing draft
         await updatePO(editingPOId, poData);
@@ -290,10 +297,20 @@ export const CreatePO: React.FC = () => {
         poData.overBudgetJustification = overBudgetJustification.trim();
       }
 
+      // Clear admin comments when resubmitting (especially for declined POs)
+      if (originalPOStatus === 'declined') {
+        poData.adminComments = null;
+      }
+
       if (isEditing && editingPOId) {
-        // Update existing draft and submit
+        // Update existing PO and submit
         await updatePO(editingPOId, poData);
-        alert('Purchase Order updated and submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+        
+        if (originalPOStatus === 'declined') {
+          alert('Purchase Order updated and resubmitted successfully!\n\nYour PO has been sent back for admin review.\nLine items have been sorted alphabetically by vendor for easy review.');
+        } else {
+          alert('Purchase Order updated and submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+        }
       } else {
         // Create new PO
         await createPO(poData);
@@ -309,6 +326,31 @@ export const CreatePO: React.FC = () => {
     }
   };
 
+  const getPageTitle = () => {
+    if (!isEditing) return 'Create Purchase Order';
+    if (originalPOStatus === 'declined') return 'Edit & Resubmit Purchase Order';
+    return 'Edit Purchase Order';
+  };
+
+  const getBadgeInfo = () => {
+    if (!isEditing) return null;
+    if (originalPOStatus === 'declined') {
+      return { variant: 'danger' as const, text: 'Resubmitting Declined PO' };
+    }
+    return { variant: 'warning' as const, text: 'Editing Draft' };
+  };
+
+  const getSubmitButtonText = () => {
+    if (!isEditing) return 'Submit for Approval';
+    if (originalPOStatus === 'declined') return 'Resubmit for Approval';
+    return 'Update & Submit for Approval';
+  };
+
+  const getSubmitButtonIcon = () => {
+    if (originalPOStatus === 'declined') return RefreshCw;
+    return null;
+  };
+
   if (loadingOrgs) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -317,18 +359,44 @@ export const CreatePO: React.FC = () => {
     );
   }
 
+  const badgeInfo = getBadgeInfo();
+  const SubmitIcon = getSubmitButtonIcon();
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-100">
-          {isEditing ? 'Edit Purchase Order' : 'Create Purchase Order'}
+          {getPageTitle()}
         </h1>
-        {isEditing && (
-          <Badge variant="warning" size="md">
-            Editing Draft
+        {badgeInfo && (
+          <Badge variant={badgeInfo.variant} size="md">
+            {badgeInfo.text}
           </Badge>
         )}
       </div>
+
+      {/* Show decline notice for declined POs being edited */}
+      {originalPOStatus === 'declined' && (
+        <Card className="border-red-600 bg-red-900/30">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0 mt-1">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            </div>
+            <div>
+              <h3 className="text-red-300 font-medium mb-2">This PO was previously declined</h3>
+              <p className="text-red-200 text-sm mb-3">
+                Please review the admin comments and make necessary changes before resubmitting.
+                Once you resubmit, it will go back to the admin for review.
+              </p>
+              <div className="bg-red-800/50 border border-red-600 rounded p-3">
+                <p className="text-red-200 text-sm font-medium">
+                  💡 Tip: Address all concerns mentioned in the admin comments to improve approval chances.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Sub-Organization Selection */}
@@ -557,7 +625,8 @@ export const CreatePO: React.FC = () => {
             Save as Draft
           </Button>
           <Button type="submit" loading={loading}>
-            {isEditing ? 'Update & Submit for Approval' : 'Submit for Approval'}
+            {SubmitIcon && <SubmitIcon className="h-4 w-4 mr-2" />}
+            {getSubmitButtonText()}
           </Button>
         </div>
       </form>
