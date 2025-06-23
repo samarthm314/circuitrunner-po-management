@@ -31,10 +31,18 @@ export const createTransaction = async (transactionData: Omit<Transaction, 'id' 
 
 export const updateTransaction = async (transactionId: string, updates: Partial<Transaction>) => {
   try {
-    await updateDoc(doc(db, 'transactions', transactionId), {
-      ...updates,
-      updatedAt: serverTimestamp(),
+    // Filter out undefined values to prevent Firestore errors
+    const cleanUpdates: any = {};
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value !== undefined) {
+        cleanUpdates[key] = value;
+      }
     });
+
+    cleanUpdates.updatedAt = serverTimestamp();
+
+    await updateDoc(doc(db, 'transactions', transactionId), cleanUpdates);
   } catch (error) {
     console.error('Error updating transaction:', error);
     throw error;

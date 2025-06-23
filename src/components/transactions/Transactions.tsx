@@ -103,6 +103,39 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+    try {
+      // Prepare data for export
+      const exportData = transactions.map(transaction => ({
+        'Post Date': transaction.postDate.toLocaleDateString(),
+        'Description': transaction.description,
+        'Amount': transaction.debitAmount,
+        'Sub-Organization': transaction.subOrgName || 'Unallocated',
+        'Status': transaction.status,
+        'Notes': transaction.notes || '',
+        'Receipt': transaction.receiptUrl ? 'Yes' : 'No',
+        'Created At': transaction.createdAt.toLocaleDateString()
+      }));
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      // Add worksheet to workbook
+      XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+
+      // Generate filename with current date
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `transactions_export_${date}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(wb, filename);
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      alert('Error exporting transactions. Please try again.');
+    }
+  };
+
   const startEdit = (transaction: Transaction) => {
     setEditingId(transaction.id);
     setEditData({
@@ -121,11 +154,22 @@ export const Transactions: React.FC = () => {
     try {
       const selectedSubOrg = subOrgs.find(org => org.id === editData.subOrgId);
       
-      await updateTransaction(transactionId, {
-        ...editData,
-        subOrgName: selectedSubOrg?.name,
-        notes: editData.notes || '', // Ensure notes is never undefined
-      });
+      // Clean the update data to remove undefined values
+      const updateData: Partial<Transaction> = {};
+      
+      if (editData.subOrgId !== undefined) {
+        updateData.subOrgId = editData.subOrgId;
+      }
+      
+      if (selectedSubOrg?.name) {
+        updateData.subOrgName = selectedSubOrg.name;
+      }
+      
+      if (editData.notes !== undefined) {
+        updateData.notes = editData.notes;
+      }
+
+      await updateTransaction(transactionId, updateData);
 
       // Recalculate budget spent for all sub-organizations (only for admin users)
       await recalculateBudgets();
@@ -192,8 +236,8 @@ export const Transactions: React.FC = () => {
     try {
       await deleteReceiptFile(receiptUrl);
       await updateTransaction(transactionId, {
-        receiptUrl: undefined,
-        receiptFileName: undefined,
+        receiptUrl: null,
+        receiptFileName: null,
       });
 
       await fetchData();
@@ -255,7 +299,7 @@ export const Transactions: React.FC = () => {
             Upload Excel
           </Button>
           
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
