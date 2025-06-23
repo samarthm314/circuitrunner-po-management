@@ -56,6 +56,20 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const triggerFileUpload = () => {
+    const fileInput = document.getElementById('excel-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  const triggerReceiptUpload = (transactionId: string) => {
+    const fileInput = document.getElementById(`receipt-upload-${transactionId}`) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
   const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -93,13 +107,6 @@ export const Transactions: React.FC = () => {
     } finally {
       setProcessingExcel(false);
       event.target.value = ''; // Reset file input
-    }
-  };
-
-  const triggerFileUpload = () => {
-    const fileInput = document.getElementById('excel-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
     }
   };
 
@@ -233,6 +240,15 @@ export const Transactions: React.FC = () => {
     } finally {
       setUploadingReceipt(null);
     }
+  };
+
+  const handleReceiptFileChange = (transactionId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleReceiptUpload(transactionId, file);
+    }
+    // Reset the input value to allow re-uploading the same file
+    event.target.value = '';
   };
 
   const handleReceiptDelete = async (transactionId: string, receiptUrl: string) => {
@@ -423,6 +439,16 @@ export const Transactions: React.FC = () => {
                       )}
                     </td>
                     <td className="py-4 px-4">
+                      {/* Hidden file input for each transaction */}
+                      <input
+                        id={`receipt-upload-${transaction.id}`}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleReceiptFileChange(transaction.id, e)}
+                        className="hidden"
+                        disabled={uploadingReceipt === transaction.id}
+                      />
+                      
                       {transaction.receiptUrl ? (
                         <div className="flex items-center space-x-2">
                           <a
@@ -430,40 +456,29 @@ export const Transactions: React.FC = () => {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-green-400 hover:text-green-300"
+                            title="View Receipt"
                           >
                             <Download className="h-4 w-4" />
                           </a>
                           <button
                             onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
                             className="text-red-400 hover:text-red-300"
+                            title="Delete Receipt"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       ) : (
-                        <label className="cursor-pointer">
-                          <input
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleReceiptUpload(transaction.id, file);
-                              }
-                            }}
-                            className="hidden"
-                            disabled={uploadingReceipt === transaction.id}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={uploadingReceipt === transaction.id}
-                            loading={uploadingReceipt === transaction.id}
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Upload
-                          </Button>
-                        </label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => triggerReceiptUpload(transaction.id)}
+                          disabled={uploadingReceipt === transaction.id}
+                          loading={uploadingReceipt === transaction.id}
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Upload
+                        </Button>
                       )}
                     </td>
                     <td className="py-4 px-4">
