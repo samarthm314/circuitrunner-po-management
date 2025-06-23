@@ -1,0 +1,250 @@
+import React, { useState, useEffect } from 'react';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { ExternalLink, Filter, Search, Eye, Trash2 } from 'lucide-react';
+import { getAllPOs, deletePO } from '../../services/poService';
+import { PurchaseOrder } from '../../types';
+import { format } from 'date-fns';
+import { PODetailsModal } from './PODetailsModal';
+
+export const AllPOs: React.FC = () => {
+  const [pos, setPOs] = useState<PurchaseOrder[]>([]);
+  const [filteredPOs, setFilteredPOs] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchAllPOs();
+  }, []);
+
+  useEffect(() => {
+    let filtered = pos;
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(po => po.status === statusFilter);
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter(po => 
+        po.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        po.subOrgName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        po.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredPOs(filtered);
+  }, [pos, statusFilter, searchTerm]);
+
+  const fetchAllPOs = async () => {
+    try {
+      const allPOs = await getAllPOs();
+      setPOs(allPOs);
+      setFilteredPOs(allPOs);
+    } catch (error) {
+      console.error('Error fetching all POs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePO = async (poId: string, poNumber: string) => {
+    if (!confirm(`Are you sure you want to delete PO #${poNumber}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleteLoading(poId);
+    try {
+      await deletePO(poId);
+      await fetchAllPOs(); // Refresh the list
+      alert('Purchase Order deleted successfully');
+    } catch (error) {
+      console.error('Error deleting PO:', error);
+      alert('Error deleting Purchase Order. Please try again.');
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  const getStatusBadge = (status: PurchaseOrder['status']) => {
+    const variants = {
+      draft: 'default',
+      pending_approval: 'warning',
+      approved: 'info',
+      declined: 'danger',
+      pending_purchase: 'info',
+      purchased: 'success',
+    } as const;
+
+    const labels = {
+      draft: 'Draft',
+      pending_approval: 'Pending Approval',
+      approved: 'Approved',
+      declined: 'Declined',
+      pending_purchase: 'Pending Purchase',
+      purchased: 'Purchased',
+    };
+
+    return (
+      <Badge variant={variants[status]}>
+        {labels[status]}
+      </Badge>
+    );
+  };
+
+  const handleViewDetails = (po: PurchaseOrder) => {
+    setSelectedPO(po);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedPO(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-100">All Purchase Orders</h1>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by creator, sub-org, or PO ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+              />
+            </div>
+          </div>
+          <div className="sm:w-48">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="all" className="text-gray-100 bg-gray-700">All Statuses</option>
+              <option value="draft" className="text-gray-100 bg-gray-700">Draft</option>
+              <option value="pending_approval" className="text-gray-100 bg-gray-700">Pending Approval</option>
+              <option value="approved" className="text-gray-100 bg-gray-700">Approved</option>
+              <option value="declined" className="text-gray-100 bg-gray-700">Declined</option>
+              <option value="pending_purchase" className="text-gray-100 bg-gray-700">Pending Purchase</option>
+              <option value="purchased" className="text-gray-100 bg-gray-700">Purchased</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      {/* Results */}
+      <div className="text-sm text-gray-400 mb-4">
+        Showing {filteredPOs.length} of {pos.length} purchase orders
+      </div>
+
+      {filteredPOs.length === 0 ? (
+        <Card>
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-lg">No purchase orders found</p>
+            <p className="text-gray-500 mt-2">Try adjusting your filters</p>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {filteredPOs.map((po) => (
+            <Card key={po.id}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-100">
+                      PO #{po.id.slice(-6).toUpperCase()}
+                    </h3>
+                    {getStatusBadge(po.status)}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-300 mb-3">
+                    <div>
+                      <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-200">Created:</span> {
+                        po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
+                      }
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-gray-300">
+                    <span className="font-medium text-gray-200">Items:</span> {po.lineItems.length} line item{po.lineItems.length !== 1 ? 's' : ''}
+                    {po.lineItems.slice(0, 2).map((item, index) => (
+                      <span key={index} className="ml-2">
+                        • {item.itemName} ({item.quantity}x)
+                        {item.sku && ` [${item.sku}]`}
+                      </span>
+                    ))}
+                    {po.lineItems.length > 2 && (
+                      <span className="ml-2 text-gray-400">
+                        +{po.lineItems.length - 2} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex space-x-2 ml-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleViewDetails(po)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View Details
+                  </Button>
+                  <Button 
+                    variant="danger" 
+                    size="sm"
+                    onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                    loading={deleteLoading === po.id}
+                    disabled={deleteLoading !== null}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* PO Details Modal */}
+      {selectedPO && (
+        <PODetailsModal
+          po={selectedPO}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
+    </div>
+  );
+};

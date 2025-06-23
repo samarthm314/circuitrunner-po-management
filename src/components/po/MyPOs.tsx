@@ -1,0 +1,230 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { ExternalLink, Eye, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { getPOsByUser, deletePO } from '../../services/poService';
+import { PurchaseOrder } from '../../types';
+import { format } from 'date-fns';
+import { PODetailsModal } from './PODetailsModal';
+
+export const MyPOs: React.FC = () => {
+  const { currentUser } = useAuth();
+  const [pos, setPOs] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchPOs();
+  }, [currentUser]);
+
+  const fetchPOs = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const userPOs = await getPOsByUser(currentUser.uid);
+      setPOs(userPOs);
+    } catch (error) {
+      console.error('Error fetching POs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePO = async (poId: string, poNumber: string) => {
+    if (!confirm(`Are you sure you want to delete PO #${poNumber}? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeleteLoading(poId);
+    try {
+      await deletePO(poId);
+      await fetchPOs(); // Refresh the list
+      alert('Purchase Order deleted successfully');
+    } catch (error) {
+      console.error('Error deleting PO:', error);
+      alert('Error deleting Purchase Order. Please try again.');
+    } finally {
+      setDeleteLoading(null);
+    }
+  };
+
+  const getStatusBadge = (status: PurchaseOrder['status']) => {
+    const variants = {
+      draft: 'default',
+      pending_approval: 'warning',
+      approved: 'info',
+      declined: 'danger',
+      pending_purchase: 'info',
+      purchased: 'success',
+    } as const;
+
+    const labels = {
+      draft: 'Draft',
+      pending_approval: 'Pending Approval',
+      approved: 'Approved',
+      declined: 'Declined',
+      pending_purchase: 'Pending Purchase',
+      purchased: 'Purchased',
+    };
+
+    return (
+      <Badge variant={variants[status]}>
+        {labels[status]}
+      </Badge>
+    );
+  };
+
+  const handleViewDetails = (po: PurchaseOrder) => {
+    setSelectedPO(po);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedPO(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-100">My Purchase Orders</h1>
+        <Button onClick={() => window.location.href = '/create-po'}>
+          Create New PO
+        </Button>
+      </div>
+
+      {pos.length === 0 ? (
+        <Card>
+          <div className="text-center py-12">
+            <p className="text-gray-400 text-lg">No purchase orders found</p>
+            <p className="text-gray-500 mt-2">Create your first PO to get started</p>
+          </div>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {pos.map((po) => (
+            <Card key={po.id}>
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-100">
+                      PO #{po.id.slice(-6).toUpperCase()}
+                    </h3>
+                    {getStatusBadge(po.status)}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
+                    <div>
+                      <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-200">Created:</span> {
+                        po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A'
+                      }
+                    </div>
+                  </div>
+
+                  {po.specialRequest && (
+                    <div className="mt-3">
+                      <span className="text-sm font-medium text-gray-200">Special Request:</span>
+                      <p className="text-sm text-gray-300 mt-1">{po.specialRequest}</p>
+                    </div>
+                  )}
+
+                  {po.adminComments && (
+                    <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg">
+                      <span className="text-sm font-medium text-yellow-300">Admin Comments:</span>
+                      <p className="text-sm text-yellow-200 mt-1">{po.adminComments}</p>
+                    </div>
+                  )}
+
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-200 mb-2">Line Items:</h4>
+                    <div className="space-y-2">
+                      {po.lineItems.map((item, index) => (
+                        <div key={index} className="flex justify-between items-center text-sm bg-gray-700 p-2 rounded">
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-100">{item.itemName}</span>
+                            <span className="text-gray-400 ml-2">from {item.vendor}</span>
+                            {item.sku && (
+                              <span className="text-gray-400 ml-2">SKU: {item.sku}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-gray-300">{item.quantity} × ${item.unitPrice.toFixed(2)}</span>
+                            <span className="font-medium text-gray-100">${item.totalPrice.toFixed(2)}</span>
+                            {item.link && (
+                              <a
+                                href={item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-green-400 hover:text-green-300"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2 ml-4">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleViewDetails(po)}
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                  {po.status === 'draft' && (
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
+                    </Button>
+                  )}
+                  <Button 
+                    variant="danger" 
+                    size="sm"
+                    onClick={() => handleDeletePO(po.id, po.id.slice(-6).toUpperCase())}
+                    loading={deleteLoading === po.id}
+                    disabled={deleteLoading !== null}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* PO Details Modal */}
+      {selectedPO && (
+        <PODetailsModal
+          po={selectedPO}
+          isOpen={isModalOpen}
+          onClose={closeModal}
+        />
+      )}
+    </div>
+  );
+};

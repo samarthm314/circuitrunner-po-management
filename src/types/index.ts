@@ -1,0 +1,70 @@
+export interface User {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'director' | 'admin' | 'purchaser';
+  createdAt: Date;
+}
+
+export interface SubOrganization {
+  id: string;
+  name: string;
+  budgetAllocated: number;
+  budgetSpent: number;
+}
+
+export interface LineItem {
+  id: string;
+  vendor: string;
+  itemName: string;
+  sku?: string;
+  quantity: number;
+  unitPrice: number;
+  link?: string;
+  totalPrice: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  subOrgId: string;
+  subOrgName: string;
+  status: 'draft' | 'pending_approval' | 'approved' | 'declined' | 'pending_purchase' | 'purchased';
+  specialRequest?: string;
+  lineItems: LineItem[];
+  totalAmount: number;
+  adminComments?: string;
+  overBudgetJustification?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  approvedAt?: Date;
+  purchasedAt?: Date;
+  receiptUrl?: string;
+}
+
+export interface Transaction {
+  id: string;
+  postDate: Date;
+  description: string;
+  debitAmount: number;
+  status: string;
+  subOrgId?: string;
+  subOrgName?: string;
+  receiptUrl?: string;
+  receiptFileName?: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface AuditLog {
+  id: string;
+  entityType: string;
+  entityId: string;
+  action: string;
+  userId: string;
+  userEmail: string;
+  timestamp: Date;
+  details: string;
+}

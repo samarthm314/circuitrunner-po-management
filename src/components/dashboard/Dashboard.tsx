@@ -1,0 +1,233 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { 
+  DollarSign, 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  TrendingUp,
+  AlertTriangle
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { getDashboardStats, getRecentActivity } from '../../services/dashboardService';
+import { getSubOrganizations } from '../../services/subOrgService';
+import { SubOrganization } from '../../types';
+
+interface DashboardStats {
+  totalPOs: number;
+  pendingPOs: number;
+  approvedPOs: number;
+  totalSpent: number;
+}
+
+interface ActivityItem {
+  id: string;
+  action: string;
+  user: string;
+  time: string;
+}
+
+export const Dashboard: React.FC = () => {
+  const { userProfile } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPOs: 0,
+    pendingPOs: 0,
+    approvedPOs: 0,
+    totalSpent: 0
+  });
+  const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [dashboardStats, subOrganizations, activity] = await Promise.all([
+          getDashboardStats(),
+          getSubOrganizations(),
+          getRecentActivity()
+        ]);
+
+        setStats({
+          totalPOs: dashboardStats.totalPOs,
+          pendingPOs: dashboardStats.pendingPOs,
+          approvedPOs: dashboardStats.approvedPOs,
+          totalSpent: dashboardStats.totalSpent
+        });
+        
+        setSubOrgs(subOrganizations);
+        setRecentActivity(activity);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const totalBudget = subOrgs.reduce((sum, org) => sum + org.budgetAllocated, 0);
+  const totalSpent = subOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
+  const budgetRemaining = totalBudget - totalSpent;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
+        <Badge variant="info" size="md">
+          {userProfile?.role?.charAt(0).toUpperCase() + userProfile?.role?.slice(1)}
+        </Badge>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-900/50 rounded-lg border border-green-700">
+              <DollarSign className="h-6 w-6 text-green-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Total Budget</p>
+              <p className="text-2xl font-bold text-gray-100">
+                ${totalBudget.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-red-900/50 rounded-lg border border-red-700">
+              <TrendingUp className="h-6 w-6 text-red-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Budget Spent</p>
+              <p className="text-2xl font-bold text-gray-100">
+                ${totalSpent.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-900/50 rounded-lg border border-blue-700">
+              <Clock className="h-6 w-6 text-blue-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Pending POs</p>
+              <p className="text-2xl font-bold text-gray-100">{stats.pendingPOs}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-900/50 rounded-lg border border-purple-700">
+              <FileText className="h-6 w-6 text-purple-400" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-400">Total POs</p>
+              <p className="text-2xl font-bold text-gray-100">{stats.totalPOs}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Budget by Sub-Organization */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Budget by Sub-Organization</CardTitle>
+          </CardHeader>
+          <div className="space-y-4">
+            {subOrgs.slice(0, 8).map((org) => {
+              const utilization = org.budgetAllocated > 0 ? (org.budgetSpent / org.budgetAllocated) * 100 : 0;
+              const isOverBudget = utilization > 100;
+              const isNearLimit = utilization > 80;
+              const remaining = org.budgetAllocated - org.budgetSpent;
+
+              return (
+                <div key={org.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-gray-100">{org.name}</span>
+                      {isOverBudget && (
+                        <AlertTriangle className="h-4 w-4 text-red-400" />
+                      )}
+                    </div>
+                    <span className="text-sm text-gray-300">
+                      ${org.budgetSpent.toLocaleString()} / ${org.budgetAllocated.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        isOverBudget 
+                          ? 'bg-red-500' 
+                          : isNearLimit 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                      }`}
+                      style={{ width: `${Math.min(utilization, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>{utilization.toFixed(1)}% utilized</span>
+                    <span className={utilization > 100 ? 'text-red-400 font-medium' : 'text-gray-300'}>
+                      ${remaining.toLocaleString()} remaining
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            {subOrgs.length > 8 && (
+              <div className="text-center pt-2">
+                <span className="text-sm text-gray-400">
+                  +{subOrgs.length - 8} more organizations
+                </span>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <div className="space-y-4">
+            {recentActivity.length > 0 ? (
+              recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-start space-x-3">
+                  <div className="p-1 bg-green-900/50 rounded-full mt-1 border border-green-700">
+                    <CheckCircle className="h-3 w-3 text-green-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-100">{activity.action}</p>
+                    <p className="text-xs text-gray-400">by {activity.user}</p>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{activity.time}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-400 text-sm">No recent activity</p>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
