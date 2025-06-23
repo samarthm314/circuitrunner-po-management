@@ -460,97 +460,104 @@ export const CreatePO: React.FC = () => {
           </CardHeader>
           <div className="space-y-4">
             {lineItems.map((item, index) => (
-              <div key={item.id} className="grid grid-cols-12 gap-4 p-4 border border-gray-600 rounded-lg bg-gray-700">
-                <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label>
-                  <input
-                    type="text"
-                    value={item.vendor}
-                    onChange={(e) => updateLineItem(item.id, 'vendor', e.target.value)}
-                    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                    placeholder="Vendor name"
-                  />
-                </div>
-                <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Item Name</label>
-                  <input
-                    type="text"
-                    value={item.itemName}
-                    onChange={(e) => updateLineItem(item.id, 'itemName', e.target.value)}
-                    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                    placeholder="Item description"
-                  />
-                </div>
-                <div className="col-span-12 sm:col-span-2">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">SKU</label>
-                  <input
-                    type="text"
-                    value={item.sku || ''}
-                    onChange={(e) => updateLineItem(item.id, 'sku', e.target.value)}
-                    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                    placeholder="SKU/Part #"
-                  />
-                </div>
-                <div className="col-span-6 sm:col-span-1">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Qty</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                  />
-                </div>
-                <div className="col-span-6 sm:col-span-2">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <div key={item.id} className="relative p-4 border border-gray-600 rounded-lg bg-gray-700">
+                {/* Delete button positioned at bottom left */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeLineItem(item.id)}
+                  disabled={lineItems.length === 1}
+                  className="absolute bottom-2 left-2 p-1 text-red-400 hover:text-red-300 z-10"
+                  title="Remove item"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+
+                {/* Grid layout for form fields */}
+                <div className="grid grid-cols-12 gap-4 pb-8">
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label>
                     <input
                       type="text"
-                      value={priceInputs[item.id] || ''}
-                      onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                      onFocus={() => handlePriceFocus(item.id)}
-                      onBlur={() => handlePriceBlur(item.id)}
-                      className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                      placeholder="0.00"
+                      value={item.vendor}
+                      onChange={(e) => updateLineItem(item.id, 'vendor', e.target.value)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      placeholder="Vendor name"
                     />
                   </div>
-                </div>
-                <div className="col-span-10 sm:col-span-2">
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
-                  <div className="flex">
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Item Name</label>
                     <input
-                      type="url"
-                      value={item.link}
-                      onChange={(e) => updateLineItem(item.id, 'link', e.target.value)}
-                      className="flex-1 px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded-l focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                      placeholder="Product URL"
+                      type="text"
+                      value={item.itemName}
+                      onChange={(e) => updateLineItem(item.id, 'itemName', e.target.value)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      placeholder="Item description"
                     />
-                    {item.link && (
-                      <a
-                        href={item.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-2 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500"
-                      >
-                        <ExternalLink className="h-4 w-4 text-gray-300" />
-                      </a>
-                    )}
+                  </div>
+                  <div className="col-span-12 sm:col-span-2">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">SKU</label>
+                    <input
+                      type="text"
+                      value={item.sku || ''}
+                      onChange={(e) => updateLineItem(item.id, 'sku', e.target.value)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      placeholder="SKU/Part #"
+                    />
+                  </div>
+                  <div className="col-span-6 sm:col-span-1">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Qty</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                    />
+                  </div>
+                  <div className="col-span-6 sm:col-span-2">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
+                      <input
+                        type="text"
+                        value={priceInputs[item.id] || ''}
+                        onChange={(e) => handlePriceChange(item.id, e.target.value)}
+                        onFocus={() => handlePriceFocus(item.id)}
+                        onBlur={() => handlePriceBlur(item.id)}
+                        className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <div className="col-span-12 sm:col-span-3">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
+                    <div className="flex">
+                      <input
+                        type="url"
+                        value={item.link}
+                        onChange={(e) => updateLineItem(item.id, 'link', e.target.value)}
+                        className="flex-1 px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded-l focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                        placeholder="Product URL"
+                      />
+                      {item.link && (
+                        <a
+                          href={item.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center"
+                          title="Open link"
+                        >
+                          <ExternalLink className="h-4 w-4 text-gray-300" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="col-span-1 sm:col-span-1 flex items-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeLineItem(item.id)}
-                    disabled={lineItems.length === 1}
-                    className="p-1 text-red-400 hover:text-red-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="col-span-12 text-right">
+
+                {/* Total price display */}
+                <div className="absolute bottom-2 right-4">
                   <span className="text-lg font-semibold text-gray-100">
                     Total: ${item.totalPrice.toFixed(2)}
                   </span>
