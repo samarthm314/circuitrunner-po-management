@@ -45,6 +45,7 @@ const AppRoutes: React.FC = () => {
     <Layout>
       <Routes>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/create-po" element={<CreatePO />} />
         <Route path="/my-pos" element={<MyPOs />} />
         <Route path="/pending-approval" element={<PendingApproval />} />
@@ -52,7 +53,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/all-pos" element={<AllPOs />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budget-management" element={<BudgetManagement />} />
-        <Route path="*" element={<Navigate to="/" />} />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </Layout>
   );

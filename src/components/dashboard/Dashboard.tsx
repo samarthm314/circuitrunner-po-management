@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
+import { useNavigate } from 'react-router-dom';
 import { 
   DollarSign, 
   FileText, 
@@ -30,6 +31,7 @@ interface ActivityItem {
 
 export const Dashboard: React.FC = () => {
   const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalPOs: 0,
     pendingPOs: 0,
@@ -71,6 +73,20 @@ export const Dashboard: React.FC = () => {
   const totalBudget = subOrgs.reduce((sum, org) => sum + org.budgetAllocated, 0);
   const totalSpent = subOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
   const budgetRemaining = totalBudget - totalSpent;
+
+  const handlePendingPOsClick = () => {
+    if (userProfile?.role === 'admin') {
+      navigate('/pending-approval');
+    }
+  };
+
+  const handleTotalPOsClick = () => {
+    if (userProfile?.role === 'admin' || userProfile?.role === 'purchaser') {
+      navigate('/all-pos');
+    } else {
+      navigate('/my-pos');
+    }
+  };
 
   if (loading) {
     return (
@@ -119,7 +135,14 @@ export const Dashboard: React.FC = () => {
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card 
+          className={`p-6 ${
+            userProfile?.role === 'admin' 
+              ? 'cursor-pointer hover:bg-gray-700/50 transition-colors' 
+              : ''
+          }`}
+          onClick={handlePendingPOsClick}
+        >
           <div className="flex items-center">
             <div className="p-2 bg-blue-900/50 rounded-lg border border-blue-700">
               <Clock className="h-6 w-6 text-blue-400" />
@@ -127,11 +150,17 @@ export const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-400">Pending POs</p>
               <p className="text-2xl font-bold text-gray-100">{stats.pendingPOs}</p>
+              {userProfile?.role === 'admin' && stats.pendingPOs > 0 && (
+                <p className="text-xs text-blue-400 mt-1">Click to review</p>
+              )}
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card 
+          className="p-6 cursor-pointer hover:bg-gray-700/50 transition-colors"
+          onClick={handleTotalPOsClick}
+        >
           <div className="flex items-center">
             <div className="p-2 bg-purple-900/50 rounded-lg border border-purple-700">
               <FileText className="h-6 w-6 text-purple-400" />
@@ -139,6 +168,7 @@ export const Dashboard: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-400">Total POs</p>
               <p className="text-2xl font-bold text-gray-100">{stats.totalPOs}</p>
+              <p className="text-xs text-purple-400 mt-1">Click to view all</p>
             </div>
           </div>
         </Card>
