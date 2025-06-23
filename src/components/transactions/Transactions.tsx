@@ -158,11 +158,13 @@ export const Transactions: React.FC = () => {
       const updateData: Partial<Transaction> = {};
       
       if (editData.subOrgId !== undefined) {
-        updateData.subOrgId = editData.subOrgId;
+        updateData.subOrgId = editData.subOrgId || null; // Use null instead of empty string
       }
       
       if (selectedSubOrg?.name) {
         updateData.subOrgName = selectedSubOrg.name;
+      } else if (editData.subOrgId === '') {
+        updateData.subOrgName = null; // Clear sub-org name if unassigned
       }
       
       if (editData.notes !== undefined) {
@@ -171,10 +173,10 @@ export const Transactions: React.FC = () => {
 
       await updateTransaction(transactionId, updateData);
 
-      // Recalculate budget spent for all sub-organizations (only for admin users)
+      // Recalculate budget spent for all sub-organizations
       await recalculateBudgets();
       
-      await fetchData();
+      await fetchData(); // Refresh data to show updated budgets
       setEditingId(null);
       setEditData({});
     } catch (error) {
@@ -184,30 +186,33 @@ export const Transactions: React.FC = () => {
   };
 
   const recalculateBudgets = async () => {
-    // Only allow admin users to update budgets
-    if (userProfile?.role !== 'admin') {
-      return; // Skip budget recalculation for non-admin users
-    }
-
     try {
-      // Calculate spent amounts for each sub-org based on transactions
+      // Get fresh transaction data to ensure accuracy
+      const currentTransactions = await getAllTransactions();
+      
+      // Calculate spent amounts for each sub-org based on current transactions
       const spentBySubOrg: { [key: string]: number } = {};
       
-      transactions.forEach(transaction => {
+      currentTransactions.forEach(transaction => {
         if (transaction.subOrgId) {
           spentBySubOrg[transaction.subOrgId] = (spentBySubOrg[transaction.subOrgId] || 0) + transaction.debitAmount;
         }
       });
 
       // Update each sub-org's budget spent
-      for (const subOrg of subOrgs) {
+      const updatePromises = subOrgs.map(async (subOrg) => {
         const newSpent = spentBySubOrg[subOrg.id] || 0;
-        if (newSpent !== subOrg.budgetSpent) {
-          await updateSubOrgBudget(subOrg.id, subOrg.budgetAllocated, newSpent);
-        }
-      }
+        // Always update to ensure consistency, even if the value appears the same
+        await updateSubOrgBudget(subOrg.id, subOrg.budgetAllocated, newSpent);
+        return { ...subOrg, budgetSpent: newSpent };
+      });
+
+      await Promise.all(updatePromises);
+      
+      console.log('Budget recalculation completed:', spentBySubOrg);
     } catch (error) {
       console.error('Error recalculating budgets:', error);
+      // Don't throw the error to prevent blocking the transaction update
     }
   };
 
