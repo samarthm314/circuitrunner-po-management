@@ -92,6 +92,31 @@ export const Dashboard: React.FC = () => {
 
   const isPendingPOsClickable = userProfile?.role === 'admin' || userProfile?.role === 'purchaser';
 
+  // Get the appropriate label and count for pending POs based on role
+  const getPendingPOsInfo = () => {
+    if (userProfile?.role === 'admin') {
+      return {
+        label: 'Pending Approval',
+        count: stats.pendingPOs,
+        description: stats.pendingPOs > 0 ? 'Click to review' : 'No POs awaiting approval'
+      };
+    } else if (userProfile?.role === 'purchaser') {
+      return {
+        label: 'Ready for Purchase',
+        count: stats.approvedPOs,
+        description: stats.approvedPOs > 0 ? 'Click to purchase' : 'No POs ready for purchase'
+      };
+    } else {
+      return {
+        label: 'Pending POs',
+        count: stats.pendingPOs,
+        description: 'POs awaiting approval'
+      };
+    }
+  };
+
+  const pendingPOsInfo = getPendingPOsInfo();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -152,13 +177,11 @@ export const Dashboard: React.FC = () => {
               <Clock className="h-6 w-6 text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Pending POs</p>
-              <p className="text-2xl font-bold text-gray-100">{stats.pendingPOs}</p>
-              {isPendingPOsClickable && stats.pendingPOs > 0 && (
-                <p className="text-xs text-blue-400 mt-1">
-                  {userProfile?.role === 'admin' ? 'Click to review' : 'Click to purchase'}
-                </p>
-              )}
+              <p className="text-sm font-medium text-gray-400">{pendingPOsInfo.label}</p>
+              <p className="text-2xl font-bold text-gray-100">{pendingPOsInfo.count}</p>
+              <p className="text-xs text-blue-400 mt-1">
+                {pendingPOsInfo.description}
+              </p>
             </div>
           </div>
         </Card>
