@@ -1,9 +1,11 @@
-import React from 'react';
-import { X, ExternalLink, Calendar, User, Building, DollarSign } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, ExternalLink, Calendar, User, Building, DollarSign, Download } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { useAuth } from '../../contexts/AuthContext';
 import { format } from 'date-fns';
+import * as XLSX from 'xlsx';
 
 interface PODetailsModalProps {
   po: PurchaseOrder;
@@ -12,6 +14,9 @@ interface PODetailsModalProps {
 }
 
 export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onClose }) => {
+  const { userProfile } = useAuth();
+  const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
+
   if (!isOpen) return null;
 
   const getStatusBadge = (status: PurchaseOrder['status']) => {
@@ -40,6 +45,68 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
     );
   };
 
+  const handleItemCheck = (itemIndex: number) => {
+    setCheckedItems(prev => ({
+      ...prev,
+      [itemIndex]: !prev[itemIndex]
+    }));
+  };
+
+  const downloadSummary = () => {
+    try {
+      // Prepare PO summary data
+      const summaryData = {
+        'PO Number': `#${po.id.slice(-6).toUpperCase()}`,
+        'Status': po.status.charAt(0).toUpperCase() + po.status.slice(1).replace('_', ' '),
+        'Created By': po.creatorName,
+        'Sub-Organization': po.subOrgName,
+        'Total Amount': `$${po.totalAmount.toFixed(2)}`,
+        'Created Date': po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
+        'Special Request': po.specialRequest || 'None',
+        'Over Budget Justification': po.overBudgetJustification || 'N/A',
+        'Admin Comments': po.adminComments || 'None'
+      };
+
+      // Prepare line items data
+      const lineItemsData = po.lineItems.map((item, index) => ({
+        'Item #': index + 1,
+        'Vendor': item.vendor,
+        'Item Name': item.itemName,
+        'SKU': item.sku || 'N/A',
+        'Quantity': item.quantity,
+        'Unit Price': `$${item.unitPrice.toFixed(2)}`,
+        'Total Price': `$${item.totalPrice.toFixed(2)}`,
+        'Product Link': item.link || 'N/A',
+        'Purchased': userProfile?.role === 'purchaser' && checkedItems[index] ? 'Yes' : 'No'
+      }));
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Add PO Summary sheet
+      const summaryWs = XLSX.utils.json_to_sheet([summaryData]);
+      XLSX.utils.book_append_sheet(wb, summaryWs, 'PO Summary');
+
+      // Add Line Items sheet
+      const lineItemsWs = XLSX.utils.json_to_sheet(lineItemsData);
+      XLSX.utils.book_append_sheet(wb, lineItemsWs, 'Line Items');
+
+      // Generate filename
+      const poNumber = po.id.slice(-6).toUpperCase();
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `PO_${poNumber}_Summary_${date}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+    } catch (error) {
+      console.error('Error generating PO summary:', error);
+      alert('Error generating PO summary. Please try again.');
+    }
+  };
+
+  const isPurchaser = userProfile?.role === 'purchaser';
+  const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'purchased');
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
@@ -51,12 +118,22 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             </h2>
             {getStatusBadge(po.status)}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5 text-gray-400" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadSummary}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Summary
+            </Button>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-400" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -121,6 +198,17 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             </div>
           )}
 
+          {/* Purchaser Instructions */}
+          {showCheckboxes && (
+            <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
+              <h3 className="font-medium text-green-300 mb-2">Purchaser Instructions</h3>
+              <p className="text-green-200 text-sm">
+                Check off items as you purchase them. Items with checkmarks will show with strikethrough text.
+                This helps you track your progress while shopping.
+              </p>
+            </div>
+          )}
+
           {/* Line Items */}
           <div>
             <h3 className="text-lg font-semibold text-gray-100 mb-4">Line Items</h3>
@@ -128,6 +216,9 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               <table className="w-full border border-gray-700 rounded-lg">
                 <thead className="bg-gray-700">
                   <tr>
+                    {showCheckboxes && (
+                      <th className="text-center py-3 px-4 font-medium text-gray-200">✓</th>
+                    )}
                     <th className="text-left py-3 px-4 font-medium text-gray-200">Item</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-200">Vendor</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-200">SKU</th>
@@ -138,36 +229,63 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
                   </tr>
                 </thead>
                 <tbody>
-                  {po.lineItems.map((item, index) => (
-                    <tr key={index} className="border-t border-gray-700">
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-gray-100">{item.itemName}</div>
-                      </td>
-                      <td className="py-3 px-4 text-gray-300">{item.vendor}</td>
-                      <td className="py-3 px-4 text-gray-300">{item.sku || 'N/A'}</td>
-                      <td className="py-3 px-4 text-center text-gray-300">{item.quantity}</td>
-                      <td className="py-3 px-4 text-right text-gray-300">${item.unitPrice.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-right font-medium text-green-400">${item.totalPrice.toFixed(2)}</td>
-                      <td className="py-3 px-4 text-center">
-                        {item.link ? (
-                          <a
-                            href={item.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-green-400 hover:text-green-300"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        ) : (
-                          <span className="text-gray-500">-</span>
+                  {po.lineItems.map((item, index) => {
+                    const isChecked = checkedItems[index] || false;
+                    const textStyle = isChecked ? 'line-through opacity-60' : '';
+                    
+                    return (
+                      <tr key={index} className="border-t border-gray-700">
+                        {showCheckboxes && (
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleItemCheck(index)}
+                              className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2"
+                            />
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="py-3 px-4">
+                          <div className={`font-medium text-gray-100 ${textStyle}`}>
+                            {item.itemName}
+                          </div>
+                        </td>
+                        <td className={`py-3 px-4 text-gray-300 ${textStyle}`}>
+                          {item.vendor}
+                        </td>
+                        <td className={`py-3 px-4 text-gray-300 ${textStyle}`}>
+                          {item.sku || 'N/A'}
+                        </td>
+                        <td className={`py-3 px-4 text-center text-gray-300 ${textStyle}`}>
+                          {item.quantity}
+                        </td>
+                        <td className={`py-3 px-4 text-right text-gray-300 ${textStyle}`}>
+                          ${item.unitPrice.toFixed(2)}
+                        </td>
+                        <td className={`py-3 px-4 text-right font-medium text-green-400 ${textStyle}`}>
+                          ${item.totalPrice.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {item.link ? (
+                            <a
+                              href={item.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-green-400 hover:text-green-300 ${isChecked ? 'opacity-60' : ''}`}
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <span className="text-gray-500">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="bg-gray-700">
                   <tr>
-                    <td colSpan={5} className="py-3 px-4 text-right font-medium text-gray-200">
+                    <td colSpan={showCheckboxes ? 6 : 5} className="py-3 px-4 text-right font-medium text-gray-200">
                       Total Amount:
                     </td>
                     <td className="py-3 px-4 text-right font-bold text-lg text-green-400">
@@ -179,6 +297,34 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               </table>
             </div>
           </div>
+
+          {/* Purchase Progress for Purchasers */}
+          {showCheckboxes && (
+            <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-200 mb-3">Purchase Progress</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-300">
+                    Items Purchased: {Object.values(checkedItems).filter(Boolean).length} of {po.lineItems.length}
+                  </p>
+                  <div className="w-64 bg-gray-600 rounded-full h-2 mt-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                      style={{
+                        width: `${(Object.values(checkedItems).filter(Boolean).length / po.lineItems.length) * 100}%`
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-green-400">
+                    {Math.round((Object.values(checkedItems).filter(Boolean).length / po.lineItems.length) * 100)}%
+                  </p>
+                  <p className="text-xs text-gray-400">Complete</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Timestamps */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-700">
