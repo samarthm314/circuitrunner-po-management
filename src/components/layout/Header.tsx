@@ -23,7 +23,7 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="bg-gray-800 shadow-sm border-b border-gray-700">
+    <header className="bg-gray-800 shadow-sm border-b border-gray-700 relative z-40">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16 w-full">
           {/* Left side - Logo and title pushed all the way to the left */}

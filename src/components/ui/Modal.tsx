@@ -27,8 +27,8 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className={`bg-gray-800 rounded-lg shadow-xl ${sizeClasses[size]} w-full border border-gray-700`}>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+      <div className={`bg-gray-800 rounded-lg shadow-xl ${sizeClasses[size]} w-full border border-gray-700 relative z-[10000]`}>
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-gray-100">{title}</h2>
           <button
@@ -111,8 +111,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700 relative z-[10000]">
         <div className="p-6">
           <div className="flex items-start space-x-4">
             <div className={`p-3 rounded-full border ${getBgColor()}`}>
@@ -195,8 +195,8 @@ export const AlertModal: React.FC<AlertModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700 relative z-[10000]">
         <div className="p-6">
           <div className="flex items-start space-x-4">
             <div className={`p-3 rounded-full border ${getBgColor()}`}>
