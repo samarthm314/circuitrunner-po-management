@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, ExternalLink, Calendar, User, Building, DollarSign, Download, MessageSquare, CheckCircle, ShoppingCart } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
@@ -226,9 +227,23 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
   const isPurchaser = userProfile?.role === 'purchaser';
   const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'pending_purchase' || po.status === 'purchased') && !shouldHideComments;
 
-  return (
-    <div className="fixed inset-0 w-full h-full min-h-screen bg-black bg-opacity-75 flex items-center justify-center z-[99999] p-4" style={{ top: 0, left: 0, right: 0, bottom: 0, position: 'fixed' }}>
-      <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700 relative z-[100000]">
+  const modalContent = (
+    <div 
+      className="fixed bg-black bg-opacity-75 flex items-center justify-center p-4"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 999999,
+        margin: 0,
+        padding: '16px'
+      }}
+    >
+      <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700 relative z-[1000000]">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <div className="flex items-center space-x-3">
@@ -554,4 +569,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       />
     </div>
   );
+
+  // Use createPortal to render the modal at the document root level
+  return createPortal(modalContent, document.body);
 };
