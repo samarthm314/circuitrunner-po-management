@@ -7,8 +7,10 @@ import { getPOsByStatus, updatePOStatus, deletePO } from '../../services/poServi
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const PendingApproval: React.FC = () => {
+  const { currentUser, userProfile } = useAuth();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -33,9 +35,18 @@ export const PendingApproval: React.FC = () => {
   };
 
   const handleApprove = async (poId: string) => {
+    if (!currentUser || !userProfile) return;
+
     setActionLoading(poId);
     try {
-      await updatePOStatus(poId, 'approved', comments[poId]);
+      await updatePOStatus(
+        poId, 
+        'approved', 
+        comments[poId], 
+        undefined, // purchaserComments
+        currentUser.uid,
+        userProfile.displayName
+      );
       await fetchPendingPOs();
       setComments(prev => ({ ...prev, [poId]: '' }));
     } catch (error) {

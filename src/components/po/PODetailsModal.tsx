@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ExternalLink, Calendar, User, Building, DollarSign, Download, MessageSquare } from 'lucide-react';
+import { X, ExternalLink, Calendar, User, Building, DollarSign, Download, MessageSquare, CheckCircle, ShoppingCart } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -23,7 +23,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
   onPOUpdated,
   isGuestView = false 
 }) => {
-  const { userProfile, isGuest } = useAuth();
+  const { userProfile, isGuest, currentUser } = useAuth();
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -78,10 +78,17 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
     // If this is the first item being checked and PO is still "approved", update to "pending_purchase"
     const anyItemsChecked = Object.values(checkedItems).some(Boolean) || newCheckedState;
     
-    if (anyItemsChecked && po.status === 'approved' && userProfile?.role === 'purchaser') {
+    if (anyItemsChecked && po.status === 'approved' && userProfile?.role === 'purchaser' && currentUser) {
       setUpdatingStatus(true);
       try {
-        await updatePOStatus(po.id, 'pending_purchase', undefined, 'Purchaser has started working on this PO');
+        await updatePOStatus(
+          po.id, 
+          'pending_purchase', 
+          undefined, 
+          'Purchaser has started working on this PO',
+          currentUser.uid,
+          userProfile.displayName
+        );
         
         // Call the callback to refresh the PO data in parent components
         if (onPOUpdated) {
@@ -119,7 +126,9 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         'Total Amount': `$${po.totalAmount.toFixed(2)}`,
         'Created Date': po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Approved Date': po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
+        'Approved By': po.approvedByName || 'N/A',
         'Purchased Date': po.purchasedAt ? format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
+        'Purchased By': po.purchasedByName || 'N/A',
       };
 
       // Only include special request and comments if not in guest mode
@@ -283,6 +292,41 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Approval and Purchase Info */}
+          {(po.approvedByName || po.purchasedByName) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {po.approvedByName && (
+                <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <h3 className="font-medium text-green-300">Approved By</h3>
+                  </div>
+                  <p className="text-green-200">{po.approvedByName}</p>
+                  {po.approvedAt && (
+                    <p className="text-green-300 text-sm mt-1">
+                      {format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy HH:mm')}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {po.purchasedByName && (
+                <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <ShoppingCart className="h-4 w-4 text-blue-400" />
+                    <h3 className="font-medium text-blue-300">Purchased By</h3>
+                  </div>
+                  <p className="text-blue-200">{po.purchasedByName}</p>
+                  {po.purchasedAt && (
+                    <p className="text-blue-300 text-sm mt-1">
+                      {format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy HH:mm')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Special Request - Hidden for guests */}
           {!shouldHideComments && po.specialRequest && (

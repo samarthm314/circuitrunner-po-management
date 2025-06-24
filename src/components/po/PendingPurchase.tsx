@@ -7,8 +7,10 @@ import { getPOsByStatus, updatePOStatus, deletePO } from '../../services/poServi
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const PendingPurchase: React.FC = () => {
+  const { currentUser, userProfile } = useAuth();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -51,13 +53,17 @@ export const PendingPurchase: React.FC = () => {
   };
 
   const confirmMarkAsPurchased = async (poId: string) => {
+    if (!currentUser || !userProfile) return;
+
     setActionLoading(poId);
     try {
       await updatePOStatus(
         poId, 
         'purchased', 
         undefined, // adminComments
-        purchaserComment.trim() || 'Marked as purchased by purchaser'
+        purchaserComment.trim() || 'Marked as purchased by purchaser',
+        currentUser.uid,
+        userProfile.displayName
       );
       await fetchPendingPurchasePOs();
       setShowCommentModal(null);

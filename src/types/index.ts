@@ -38,6 +38,12 @@ export interface PurchaseOrder {
   adminComments?: string;
   purchaserComments?: string; // Added purchaser comments field
   overBudgetJustification?: string;
+  // Approval tracking
+  approvedById?: string;
+  approvedByName?: string;
+  // Purchase tracking
+  purchasedById?: string;
+  purchasedByName?: string;
   createdAt: Date;
   updatedAt: Date;
   approvedAt?: Date;

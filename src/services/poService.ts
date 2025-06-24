@@ -57,7 +57,9 @@ export const updatePOStatus = async (
   poId: string, 
   status: PurchaseOrder['status'], 
   adminComments?: string,
-  purchaserComments?: string
+  purchaserComments?: string,
+  userId?: string,
+  userName?: string
 ) => {
   try {
     const updateData: any = {
@@ -73,10 +75,14 @@ export const updatePOStatus = async (
       updateData.purchaserComments = purchaserComments;
     }
 
-    if (status === 'approved') {
+    if (status === 'approved' && userId && userName) {
       updateData.approvedAt = serverTimestamp();
-    } else if (status === 'purchased') {
+      updateData.approvedById = userId;
+      updateData.approvedByName = userName;
+    } else if (status === 'purchased' && userId && userName) {
       updateData.purchasedAt = serverTimestamp();
+      updateData.purchasedById = userId;
+      updateData.purchasedByName = userName;
     }
 
     await updateDoc(doc(db, 'purchaseOrders', poId), updateData);
