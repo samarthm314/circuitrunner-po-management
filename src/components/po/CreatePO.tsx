@@ -193,15 +193,16 @@ export const CreatePO: React.FC = () => {
   };
 
   const handlePriceFocus = (id: string) => {
-    // Set cursor to the beginning of the input
     const input = priceInputRefs.current[id];
     if (input) {
-      // Use setTimeout to ensure the focus event completes first
+      // wait for the native focus to settle, then move caret to end
       setTimeout(() => {
-        input.setSelectionRange(0, 0);
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
       }, 0);
     }
   };
+
 
   const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
   const selectedOrg = subOrganizations.find(org => org.id === selectedSubOrg);
