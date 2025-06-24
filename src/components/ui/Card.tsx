@@ -14,9 +14,9 @@ export const Card: React.FC<CardProps> = ({
   onClick 
 }) => {
   const paddingClasses = {
-    sm: 'p-4',
-    md: 'p-6',
-    lg: 'p-8',
+    sm: 'p-3 sm:p-4',
+    md: 'p-4 sm:p-6',
+    lg: 'p-6 sm:p-8',
   };
 
   return (
@@ -41,7 +41,7 @@ export const CardHeader: React.FC<{ children: React.ReactNode; className?: strin
   children, 
   className = '' 
 }) => (
-  <div className={`border-b border-gray-700 pb-4 mb-6 ${className}`}>
+  <div className={`border-b border-gray-700 pb-3 sm:pb-4 mb-4 sm:mb-6 ${className}`}>
     {children}
   </div>
 );
@@ -50,7 +50,7 @@ export const CardTitle: React.FC<{ children: React.ReactNode; className?: string
   children, 
   className = '' 
 }) => (
-  <h3 className={`text-lg font-semibold text-gray-100 ${className}`}>
+  <h3 className={`text-base sm:text-lg font-semibold text-gray-100 ${className}`}>
     {children}
   </h3>
 );

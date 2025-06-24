@@ -132,38 +132,38 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-100">Dashboard</h1>
         <Badge variant="info" size="md">
           {userProfile?.role?.charAt(0).toUpperCase() + userProfile?.role?.slice(1)}
         </Badge>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-green-900/50 rounded-lg border border-green-700">
-              <DollarSign className="h-6 w-6 text-green-400" />
+            <div className="p-2 bg-green-900/50 rounded-lg border border-green-700 flex-shrink-0">
+              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-green-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total Budget</p>
-              <p className="text-2xl font-bold text-gray-100">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-400">Total Budget</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-100 truncate">
                 ${totalBudget.toLocaleString()}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-red-900/50 rounded-lg border border-red-700">
-              <TrendingUp className="h-6 w-6 text-red-400" />
+            <div className="p-2 bg-red-900/50 rounded-lg border border-red-700 flex-shrink-0">
+              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Budget Spent</p>
-              <p className="text-2xl font-bold text-gray-100">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-400">Budget Spent</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-100 truncate">
                 ${totalSpent.toLocaleString()}
               </p>
             </div>
@@ -171,7 +171,7 @@ export const Dashboard: React.FC = () => {
         </Card>
 
         <Card 
-          className={`p-6 ${
+          className={`p-4 sm:p-6 ${
             isPendingPOsClickable 
               ? 'cursor-pointer hover:bg-gray-700/50 transition-colors' 
               : ''
@@ -179,13 +179,13 @@ export const Dashboard: React.FC = () => {
           onClick={isPendingPOsClickable ? handlePendingPOsClick : undefined}
         >
           <div className="flex items-center">
-            <div className="p-2 bg-blue-900/50 rounded-lg border border-blue-700">
-              <Clock className="h-6 w-6 text-blue-400" />
+            <div className="p-2 bg-blue-900/50 rounded-lg border border-blue-700 flex-shrink-0">
+              <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-blue-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">{pendingPOsInfo.label}</p>
-              <p className="text-2xl font-bold text-gray-100">{pendingPOsInfo.count}</p>
-              <p className="text-xs text-blue-400 mt-1">
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-400 truncate">{pendingPOsInfo.label}</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-100">{pendingPOsInfo.count}</p>
+              <p className="text-xs text-blue-400 mt-1 truncate">
                 {pendingPOsInfo.description}
               </p>
             </div>
@@ -193,29 +193,29 @@ export const Dashboard: React.FC = () => {
         </Card>
 
         <Card 
-          className="p-6 cursor-pointer hover:bg-gray-700/50 transition-colors"
+          className="p-4 sm:p-6 cursor-pointer hover:bg-gray-700/50 transition-colors"
           onClick={handleTotalPOsClick}
         >
           <div className="flex items-center">
-            <div className="p-2 bg-purple-900/50 rounded-lg border border-purple-700">
-              <FileText className="h-6 w-6 text-purple-400" />
+            <div className="p-2 bg-purple-900/50 rounded-lg border border-purple-700 flex-shrink-0">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total POs</p>
-              <p className="text-2xl font-bold text-gray-100">{stats.totalPOs}</p>
-              <p className="text-xs text-purple-400 mt-1">Click to view all</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-400">Total POs</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-100">{stats.totalPOs}</p>
+              <p className="text-xs text-purple-400 mt-1 truncate">Click to view all</p>
             </div>
           </div>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Budget by Sub-Organization */}
         <Card>
           <CardHeader>
-            <CardTitle>Budget by Sub-Organization</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Budget by Sub-Organization</CardTitle>
           </CardHeader>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {subOrgs.slice(0, 8).map((org) => {
               const utilization = org.budgetAllocated > 0 ? (org.budgetSpent / org.budgetAllocated) * 100 : 0;
               const isOverBudget = utilization > 100;
@@ -225,13 +225,13 @@ export const Dashboard: React.FC = () => {
               return (
                 <div key={org.id} className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-100">{org.name}</span>
+                    <div className="flex items-center space-x-2 min-w-0">
+                      <span className="font-medium text-gray-100 text-sm sm:text-base truncate">{org.name}</span>
                       {isOverBudget && (
-                        <AlertTriangle className="h-4 w-4 text-red-400" />
+                        <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-400 flex-shrink-0" />
                       )}
                     </div>
-                    <span className="text-sm text-gray-300">
+                    <span className="text-xs sm:text-sm text-gray-300 whitespace-nowrap ml-2">
                       ${org.budgetSpent.toLocaleString()} / ${org.budgetAllocated.toLocaleString()}
                     </span>
                   </div>
@@ -269,18 +269,18 @@ export const Dashboard: React.FC = () => {
         {/* Recent Activity */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Recent Activity</CardTitle>
           </CardHeader>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {recentActivity.length > 0 ? (
               recentActivity.map((activity) => (
                 <div key={activity.id} className="flex items-start space-x-3">
-                  <div className="p-1 bg-green-900/50 rounded-full mt-1 border border-green-700">
-                    <CheckCircle className="h-3 w-3 text-green-400" />
+                  <div className="p-1 bg-green-900/50 rounded-full mt-1 border border-green-700 flex-shrink-0">
+                    <CheckCircle className="h-2 w-2 sm:h-3 sm:w-3 text-green-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-100">{activity.action}</p>
-                    <p className="text-xs text-gray-400">by {activity.user}</p>
+                    <p className="text-sm font-medium text-gray-100 truncate">{activity.action}</p>
+                    <p className="text-xs text-gray-400 truncate">by {activity.user}</p>
                   </div>
                   <span className="text-xs text-gray-400 whitespace-nowrap">{activity.time}</span>
                 </div>

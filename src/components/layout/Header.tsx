@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, User, Eye } from 'lucide-react';
+import { LogOut, User, Eye, Menu } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -29,43 +29,47 @@ export const Header: React.FC = () => {
 
   return (
     <header className="bg-gray-800 shadow-sm border-b border-gray-700 relative z-40">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16 w-full">
-          {/* Left side - Logo and title pushed all the way to the left */}
-          <div className="flex items-center flex-shrink-0">
+      <div className="w-full px-3 sm:px-4 lg:px-6">
+        <div className="flex justify-between items-center h-14 sm:h-16 w-full">
+          {/* Left side - Logo and title */}
+          <div className="flex items-center flex-shrink-0 min-w-0">
             <img 
               src="/5226055 (1).png" 
               alt="CircuitRunners Logo" 
-              className="h-8 w-8"
+              className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0"
             />
-            <h1 className="ml-2 text-xl font-bold text-gray-100 whitespace-nowrap">
-              CircuitRunners Finances
+            <h1 className="ml-2 text-sm sm:text-lg lg:text-xl font-bold text-gray-100 truncate">
+              <span className="hidden sm:inline">CircuitRunners Finances</span>
+              <span className="sm:hidden">CR Finances</span>
             </h1>
             {isGuest && (
-              <div className="ml-6">
+              <div className="ml-2 sm:ml-6">
                 <Badge variant="info" size="sm">
                   <Eye className="h-3 w-3 mr-1" />
-                  Guest Mode
+                  <span className="hidden sm:inline">Guest Mode</span>
+                  <span className="sm:hidden">Guest</span>
                 </Badge>
               </div>
             )}
           </div>
           
-          {/* Right side - User controls pushed all the way to the right */}
-          <div className="flex items-center space-x-4 flex-shrink-0">
+          {/* Right side - User controls */}
+          <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
             {!isGuest && <NotificationDropdown />}
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <div className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-gray-400" />
-                <div className="text-sm">
-                  <p className="font-medium text-gray-100">{userProfile?.displayName}</p>
-                  <div className="flex items-center space-x-2">
-                    <p className="text-gray-400 capitalize">
-                      {isGuest ? 'Guest (Read-Only)' : displayRoles}
+                <User className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 flex-shrink-0" />
+                <div className="text-xs sm:text-sm min-w-0">
+                  <p className="font-medium text-gray-100 truncate max-w-24 sm:max-w-none">
+                    {userProfile?.displayName}
+                  </p>
+                  <div className="flex items-center space-x-1 sm:space-x-2">
+                    <p className="text-gray-400 capitalize text-xs sm:text-sm truncate">
+                      {isGuest ? 'Guest' : displayRoles}
                     </p>
                     {userRoles.length > 1 && !isGuest && (
-                      <div className="flex space-x-1">
+                      <div className="hidden sm:flex space-x-1">
                         {userRoles.map(role => (
                           <Badge key={role} variant="info" size="sm">
                             {role.charAt(0).toUpperCase()}
@@ -81,10 +85,10 @@ export const Header: React.FC = () => {
                 variant="danger"
                 size="sm"
                 onClick={handleSignOut}
-                className="flex items-center"
+                className="flex items-center px-2 sm:px-3"
               >
-                <LogOut className="h-4 w-4 mr-2" />
-                Log Out
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Log Out</span>
               </Button>
             </div>
           </div>

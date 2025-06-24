@@ -427,9 +427,9 @@ export const CreatePO: React.FC = () => {
   const SubmitIcon = getSubmitButtonIcon();
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-100">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-100">
           {getPageTitle()}
         </h1>
         {badgeInfo && (
@@ -462,11 +462,11 @@ export const CreatePO: React.FC = () => {
         </Card>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* PO Name and Sub-Organization */}
         <Card>
           <CardHeader>
-            <CardTitle>Purchase Order Details</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Purchase Order Details</CardTitle>
           </CardHeader>
           <div className="space-y-4">
             <div>
@@ -478,7 +478,7 @@ export const CreatePO: React.FC = () => {
                 value={poName}
                 onChange={(e) => setPOName(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
-                placeholder="Enter a descriptive name for this PO (e.g., 'FTC Robot Parts Q1 2024', 'Marketing Materials Spring Campaign')"
+                placeholder="Enter a descriptive name for this PO"
                 required
               />
               <p className="text-xs text-gray-400 mt-1">
@@ -505,7 +505,7 @@ export const CreatePO: React.FC = () => {
 
             {selectedOrg && (
               <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
-                <div className="flex justify-between items-center mb-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
                   <span className="font-medium text-gray-100">{selectedOrg.name} Budget</span>
                   <Badge variant={remainingBudget > 0 ? 'success' : 'danger'}>
                     ${remainingBudget.toLocaleString()} remaining
@@ -527,9 +527,9 @@ export const CreatePO: React.FC = () => {
 
         {/* Line Items */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <CardTitle>Line Items</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Line Items</CardTitle>
               <p className="text-sm text-gray-400 mt-1">
                 Items will be sorted alphabetically by vendor when submitted
               </p>
@@ -555,9 +555,9 @@ export const CreatePO: React.FC = () => {
                   <Trash2 className="h-4 w-4" />
                 </Button>
 
-                {/* Grid layout for form fields */}
-                <div className="grid grid-cols-12 gap-4 pb-8">
-                  <div className="col-span-12 sm:col-span-3">
+                {/* Grid layout for form fields - responsive */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 pb-8">
+                  <div className="lg:col-span-3">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label>
                     <input
                       type="text"
@@ -567,7 +567,7 @@ export const CreatePO: React.FC = () => {
                       placeholder="Vendor name"
                     />
                   </div>
-                  <div className="col-span-12 sm:col-span-3">
+                  <div className="lg:col-span-3">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Item Name</label>
                     <input
                       type="text"
@@ -577,7 +577,7 @@ export const CreatePO: React.FC = () => {
                       placeholder="Item description"
                     />
                   </div>
-                  <div className="col-span-12 sm:col-span-2">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">SKU</label>
                     <input
                       type="text"
@@ -587,7 +587,7 @@ export const CreatePO: React.FC = () => {
                       placeholder="SKU/Part #"
                     />
                   </div>
-                  <div className="col-span-6 sm:col-span-1">
+                  <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Qty</label>
                     <input
                       type="number"
@@ -597,7 +597,7 @@ export const CreatePO: React.FC = () => {
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                     />
                   </div>
-                  <div className="col-span-6 sm:col-span-2">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
                     <div className="relative">
                       <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -612,7 +612,7 @@ export const CreatePO: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div className="col-span-12 sm:col-span-3">
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
                     <div className="flex">
                       <input
@@ -639,7 +639,7 @@ export const CreatePO: React.FC = () => {
 
                 {/* Total price display */}
                 <div className="absolute bottom-2 right-4">
-                  <span className="text-lg font-semibold text-gray-100">
+                  <span className="text-base sm:text-lg font-semibold text-gray-100">
                     Total: ${item.totalPrice.toFixed(2)}
                   </span>
                 </div>
@@ -651,7 +651,7 @@ export const CreatePO: React.FC = () => {
         {/* Special Request */}
         <Card>
           <CardHeader>
-            <CardTitle>Special Request</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Special Request</CardTitle>
           </CardHeader>
           <textarea
             value={specialRequest}
@@ -666,7 +666,7 @@ export const CreatePO: React.FC = () => {
         {isOverBudget && (
           <Card className="border-yellow-600 bg-yellow-900/30">
             <CardHeader>
-              <CardTitle className="text-yellow-300">Over Budget Justification Required</CardTitle>
+              <CardTitle className="text-yellow-300 text-base sm:text-lg">Over Budget Justification Required</CardTitle>
             </CardHeader>
             <div className="mb-4">
               <p className="text-sm text-yellow-200 mb-2">
@@ -686,16 +686,16 @@ export const CreatePO: React.FC = () => {
 
         {/* Summary */}
         <Card>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-100">PO Summary</h3>
               <p className="text-sm text-gray-300">{lineItems.length} line items</p>
               {poName && (
-                <p className="text-sm text-gray-400 mt-1">Name: {poName}</p>
+                <p className="text-sm text-gray-400 mt-1 truncate">Name: {poName}</p>
               )}
             </div>
             <div className="text-right">
-              <p className="text-2xl font-bold text-gray-100">${totalAmount.toFixed(2)}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-100">${totalAmount.toFixed(2)}</p>
               {isOverBudget && (
                 <Badge variant="warning" size="sm">Over Budget</Badge>
               )}
@@ -704,18 +704,19 @@ export const CreatePO: React.FC = () => {
         </Card>
 
         {/* Submit Buttons */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
           <Button 
             type="button" 
             variant="outline" 
             onClick={handleSaveDraft}
             disabled={loading}
             loading={loading}
+            className="w-full sm:w-auto"
           >
             <Save className="h-4 w-4 mr-2" />
             Save as Draft
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} className="w-full sm:w-auto">
             {SubmitIcon && <SubmitIcon className="h-4 w-4 mr-2" />}
             {getSubmitButtonText()}
           </Button>
