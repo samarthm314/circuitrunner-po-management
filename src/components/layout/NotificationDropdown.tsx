@@ -1,27 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, X, CheckCircle, Clock, ShoppingCart, AlertTriangle, AlertCircle, XCircle, Upload, Receipt } from 'lucide-react';
+import { Bell, X, CheckCircle, Clock, ShoppingCart, AlertTriangle, AlertCircle, XCircle, Upload, Receipt, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getNotificationsForUser, getNotificationCount, Notification } from '../../services/notificationService';
+import { 
+  getNotificationsForUser, 
+  getNotificationCount, 
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  Notification 
+} from '../../services/notificationService';
 import { useAuth } from '../../contexts/AuthContext';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
 export const NotificationDropdown: React.FC = () => {
-  const { userProfile, getAllRoles } = useAuth();
+  const { userProfile, getAllRoles, currentUser } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [markingAsRead, setMarkingAsRead] = useState<string | null>(null);
+  const [markingAllAsRead, setMarkingAllAsRead] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const userRoles = getAllRoles();
-    if (userRoles.length > 0) {
+    if (userRoles.length > 0 && userRoles[0] !== 'guest') {
       fetchNotifications();
       fetchUnreadCount();
+      
+      // Set up periodic refresh every 30 seconds
+      const interval = setInterval(() => {
+        fetchNotifications();
+        fetchUnreadCount();
+      }, 30000);
+      
+      return () => clearInterval(interval);
     }
-  }, [userProfile]);
+  }, [userProfile, currentUser]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -36,11 +52,11 @@ export const NotificationDropdown: React.FC = () => {
 
   const fetchNotifications = async () => {
     const userRoles = getAllRoles();
-    if (userRoles.length === 0) return;
+    if (userRoles.length === 0 || userRoles[0] === 'guest' || !currentUser) return;
     
     setLoading(true);
     try {
-      const userNotifications = await getNotificationsForUser(userRoles);
+      const userNotifications = await getNotificationsForUser(userRoles, currentUser.uid);
       setNotifications(userNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -51,21 +67,72 @@ export const NotificationDropdown: React.FC = () => {
 
   const fetchUnreadCount = async () => {
     const userRoles = getAllRoles();
-    if (userRoles.length === 0) return;
+    if (userRoles.length === 0 || userRoles[0] === 'guest' || !currentUser) return;
     
     try {
-      const count = await getNotificationCount(userRoles);
+      const count = await getNotificationCount(userRoles, currentUser.uid);
       setUnreadCount(count);
     } catch (error) {
       console.error('Error fetching notification count:', error);
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!currentUser) return;
+    
+    // Mark as read if not already read
+    if (!notification.isRead) {
+      setMarkingAsRead(notification.id);
+      try {
+        await markNotificationAsRead(currentUser.uid, notification.id);
+        
+        // Update local state
+        setNotifications(prev => 
+          prev.map(n => 
+            n.id === notification.id ? { ...n, isRead: true } : n
+          )
+        );
+        
+        // Update unread count
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      } catch (error) {
+        console.error('Error marking notification as read:', error);
+      } finally {
+        setMarkingAsRead(null);
+      }
+    }
+    
+    // Navigate to action URL if provided
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
     }
+    
     setIsOpen(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (!currentUser) return;
+    
+    const unreadNotifications = notifications.filter(n => !n.isRead);
+    if (unreadNotifications.length === 0) return;
+    
+    setMarkingAllAsRead(true);
+    try {
+      const unreadIds = unreadNotifications.map(n => n.id);
+      await markAllNotificationsAsRead(currentUser.uid, unreadIds);
+      
+      // Update local state
+      setNotifications(prev => 
+        prev.map(n => ({ ...n, isRead: true }))
+      );
+      
+      // Reset unread count
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    } finally {
+      setMarkingAllAsRead(false);
+    }
   };
 
   const getIcon = (iconName: string) => {
@@ -115,6 +182,8 @@ export const NotificationDropdown: React.FC = () => {
     }
   };
 
+  const unreadNotifications = notifications.filter(n => !n.isRead);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -133,13 +202,33 @@ export const NotificationDropdown: React.FC = () => {
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-[9999] max-h-80 sm:max-h-96 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-700">
-            <h3 className="text-base sm:text-lg font-semibold text-gray-100">Notifications</h3>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-gray-400 hover:text-gray-300"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-100">
+              Notifications
+              {unreadCount > 0 && (
+                <span className="ml-2 text-sm text-red-400">({unreadCount} unread)</span>
+              )}
+            </h3>
+            <div className="flex items-center space-x-2">
+              {unreadNotifications.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleMarkAllAsRead}
+                  loading={markingAllAsRead}
+                  disabled={markingAllAsRead}
+                  className="text-xs"
+                >
+                  <Check className="h-3 w-3 mr-1" />
+                  Mark all read
+                </Button>
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-gray-400 hover:text-gray-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Content */}
@@ -160,9 +249,9 @@ export const NotificationDropdown: React.FC = () => {
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-3 sm:p-4 hover:bg-gray-700/50 cursor-pointer transition-colors ${
+                    className={`p-3 sm:p-4 hover:bg-gray-700/50 cursor-pointer transition-colors relative ${
                       !notification.isRead ? 'bg-gray-700/30' : ''
-                    }`}
+                    } ${markingAsRead === notification.id ? 'opacity-50' : ''}`}
                   >
                     <div className="flex items-start space-x-3">
                       <div className={`p-1 rounded-full ${getPriorityColor(notification.priority)} flex-shrink-0`}>
@@ -199,10 +288,18 @@ export const NotificationDropdown: React.FC = () => {
                           {notification.type === 'po_status' && (
                             <Badge variant="info" size="sm">PO</Badge>
                           )}
+                          {notification.type === 'transaction' && (
+                            <Badge variant="success" size="sm">Transaction</Badge>
+                          )}
                         </div>
                       </div>
                       {!notification.isRead && (
                         <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                      )}
+                      {markingAsRead === notification.id && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-800/50">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -222,8 +319,9 @@ export const NotificationDropdown: React.FC = () => {
                   fetchUnreadCount();
                 }}
                 className="w-full text-gray-300 hover:text-gray-100"
+                disabled={loading}
               >
-                Refresh Notifications
+                {loading ? 'Refreshing...' : 'Refresh Notifications'}
               </Button>
             </div>
           )}
