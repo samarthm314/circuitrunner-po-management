@@ -31,6 +31,7 @@ import { getSubOrganizations } from '../../services/subOrgService';
 import { getPOsByStatus, getPOById } from '../../services/poService';
 import { useAuth } from '../../contexts/AuthContext';
 import { PODetailsModal } from '../po/PODetailsModal';
+import { GuestTransactions } from './GuestTransactions';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
@@ -56,6 +57,11 @@ export const Transactions: React.FC = () => {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isPODetailsModalOpen, setIsPODetailsModalOpen] = useState(false);
   const [loadingPODetails, setLoadingPODetails] = useState(false);
+
+  // If user is a guest, show the guest version
+  if (isGuest) {
+    return <GuestTransactions />;
+  }
 
   useEffect(() => {
     fetchData();
@@ -417,32 +423,28 @@ export const Transactions: React.FC = () => {
             accept=".xlsx,.xls"
             onChange={handleExcelUpload}
             className="hidden"
-            disabled={processingExcel || isGuest}
+            disabled={processingExcel}
           />
           
           {/* Visible upload button */}
-          {!isGuest && (
-            <Button 
-              onClick={triggerFileUpload}
-              disabled={processingExcel} 
-              loading={processingExcel}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Excel
-            </Button>
-          )}
+          <Button 
+            onClick={triggerFileUpload}
+            disabled={processingExcel} 
+            loading={processingExcel}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Excel
+          </Button>
           
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
 
-          {!isGuest && (
-            <Button variant="outline" onClick={handleRecalculateBudgets}>
-              <Building className="h-4 w-4 mr-2" />
-              Recalculate Budgets
-            </Button>
-          )}
+          <Button variant="outline" onClick={handleRecalculateBudgets}>
+            <Building className="h-4 w-4 mr-2" />
+            Recalculate Budgets
+          </Button>
         </div>
       </div>
 
@@ -542,9 +544,7 @@ export const Transactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
-                {!isGuest && (
-                  <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
-                )}
+                <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -593,7 +593,7 @@ export const Transactions: React.FC = () => {
                         accept=".pdf,.jpg,.jpeg,.png"
                         onChange={(e) => handleReceiptFileChange(transaction.id, e)}
                         className="hidden"
-                        disabled={uploadingReceipt === transaction.id || isGuest}
+                        disabled={uploadingReceipt === transaction.id}
                       />
                       
                       {transaction.receiptUrl ? (
@@ -607,29 +607,25 @@ export const Transactions: React.FC = () => {
                           >
                             <Download className="h-4 w-4" />
                           </a>
-                          {!isGuest && (
-                            <button
-                              onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
-                              className="text-red-400 hover:text-red-300"
-                              title="Delete Receipt"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
+                            className="text-red-400 hover:text-red-300"
+                            title="Delete Receipt"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       ) : (
-                        !isGuest && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => triggerReceiptUpload(transaction.id)}
-                            disabled={uploadingReceipt === transaction.id}
-                            loading={uploadingReceipt === transaction.id}
-                          >
-                            <Upload className="h-3 w-3 mr-1" />
-                            Upload
-                          </Button>
-                        )
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => triggerReceiptUpload(transaction.id)}
+                          disabled={uploadingReceipt === transaction.id}
+                          loading={uploadingReceipt === transaction.id}
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Upload
+                        </Button>
                       )}
                     </td>
                     <td className="py-4 px-4">
@@ -661,71 +657,65 @@ export const Transactions: React.FC = () => {
                             </Badge>
                             <Eye className="h-3 w-3 text-gray-400" />
                           </button>
-                          {!isGuest && (
-                            <button
-                              onClick={() => handleUnlinkPO(transaction.id)}
-                              className="text-red-400 hover:text-red-300"
-                              title="Unlink PO"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleUnlinkPO(transaction.id)}
+                            className="text-red-400 hover:text-red-300"
+                            title="Unlink PO"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
                         </div>
                       ) : (
-                        !isGuest && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSelectPO(transaction.id)}
-                          >
-                            <Link className="h-3 w-3 mr-1" />
-                            Select PO
-                          </Button>
-                        )
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelectPO(transaction.id)}
+                        >
+                          <Link className="h-3 w-3 mr-1" />
+                          Select PO
+                        </Button>
                       )}
                     </td>
-                    {!isGuest && (
-                      <td className="py-4 px-4 text-center">
-                        {isEditing ? (
-                          <div className="flex items-center justify-center space-x-2">
-                            <Button
-                              size="sm"
-                              onClick={() => saveEdit(transaction.id)}
-                              loading={savingEdit}
-                              disabled={savingEdit}
-                            >
-                              <Save className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={cancelEdit}
-                              disabled={savingEdit}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => startEdit(transaction)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteTransaction(transaction.id)}
-                              className="text-red-400 hover:text-red-300"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </td>
-                    )}
+                    <td className="py-4 px-4 text-center">
+                      {isEditing ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={() => saveEdit(transaction.id)}
+                            loading={savingEdit}
+                            disabled={savingEdit}
+                          >
+                            <Save className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => startEdit(transaction)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}

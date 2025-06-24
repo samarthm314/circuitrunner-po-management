@@ -13,13 +13,23 @@ interface PODetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPOUpdated?: () => void; // Callback to refresh PO data
+  isGuestView?: boolean; // New prop to indicate guest view
 }
 
-export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onClose, onPOUpdated }) => {
-  const { userProfile } = useAuth();
+export const PODetailsModal: React.FC<PODetailsModalProps> = ({ 
+  po, 
+  isOpen, 
+  onClose, 
+  onPOUpdated,
+  isGuestView = false 
+}) => {
+  const { userProfile, isGuest } = useAuth();
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Determine if we should hide comments (for guests or when explicitly requested)
+  const shouldHideComments = isGuest || isGuestView;
 
   // Reset checked items when PO changes
   useEffect(() => {
@@ -55,6 +65,9 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
   };
 
   const handleItemCheck = async (itemIndex: number) => {
+    // Don't allow checking items for guests
+    if (shouldHideComments) return;
+    
     const newCheckedState = !checkedItems[itemIndex];
     
     setCheckedItems(prev => ({
@@ -109,8 +122,11 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
         'Purchased Date': po.purchasedAt ? format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Special Request': po.specialRequest || 'None',
         'Over Budget Justification': po.overBudgetJustification || 'N/A',
-        'Admin Comments': po.adminComments || 'None',
-        'Purchaser Comments': po.purchaserComments || 'None'
+        // Only include comments if not hiding them
+        ...(shouldHideComments ? {} : {
+          'Admin Comments': po.adminComments || 'None',
+          'Purchaser Comments': po.purchaserComments || 'None'
+        })
       };
 
       // Prepare line items data
@@ -186,7 +202,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
   };
 
   const isPurchaser = userProfile?.role === 'purchaser';
-  const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'pending_purchase' || po.status === 'purchased');
+  const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'pending_purchase' || po.status === 'purchased') && !shouldHideComments;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
@@ -198,6 +214,9 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
               {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
             </h2>
             {getStatusBadge(po.status)}
+            {shouldHideComments && (
+              <Badge variant="info" size="sm">Read-Only</Badge>
+            )}
             {updatingStatus && (
               <div className="flex items-center space-x-2 text-yellow-400">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
@@ -279,16 +298,16 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             </div>
           )}
 
-          {/* Admin Comments */}
-          {po.adminComments && (
+          {/* Admin Comments - Hidden for guests */}
+          {!shouldHideComments && po.adminComments && (
             <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
               <h3 className="font-medium text-gray-200 mb-2">Admin Comments</h3>
               <p className="text-gray-300">{po.adminComments}</p>
             </div>
           )}
 
-          {/* Purchaser Comments */}
-          {po.purchaserComments && (
+          {/* Purchaser Comments - Hidden for guests */}
+          {!shouldHideComments && po.purchaserComments && (
             <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
               <div className="flex items-start space-x-2">
                 <MessageSquare className="h-4 w-4 text-green-400 mt-0.5" />
@@ -300,7 +319,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             </div>
           )}
 
-          {/* Purchaser Instructions */}
+          {/* Purchaser Instructions - Hidden for guests */}
           {showCheckboxes && (
             <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
               <h3 className="font-medium text-green-300 mb-2">Purchaser Instructions</h3>
@@ -405,7 +424,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             </div>
           </div>
 
-          {/* Purchase Progress for Purchasers */}
+          {/* Purchase Progress for Purchasers - Hidden for guests */}
           {showCheckboxes && (
             <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
               <h3 className="font-medium text-gray-200 mb-3">Purchase Progress</h3>
