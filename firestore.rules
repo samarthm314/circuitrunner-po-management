@@ -1,15 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to get all user roles (primary role + roles array)
+    function getUserRoles(userId) {
+      let userDoc = get(/databases/$(database)/documents/users/$(userId));
+      let primaryRole = userDoc.data.role;
+      let additionalRoles = userDoc.data.get('roles', []);
+      return [primaryRole].concat(additionalRoles);
+    }
+    
+    // Helper function to check if user has any of the specified roles
+    function hasAnyRole(userId, allowedRoles) {
+      let userRoles = getUserRoles(userId);
+      return userRoles.hasAny(allowedRoles);
+    }
+    
     // Users can read/write their own user document, admins can read all user documents
     match /users/{userId} {
       allow read: if request.auth != null && (
         request.auth.uid == userId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        hasAnyRole(request.auth.uid, ['admin'])
       );
       allow write: if request.auth != null && (
         request.auth.uid == userId ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        hasAnyRole(request.auth.uid, ['admin'])
       );
     }
     
@@ -17,9 +31,9 @@ service cloud.firestore {
     match /subOrganizations/{subOrgId} {
       allow read: if true;
       allow write: if request.auth != null && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        hasAnyRole(request.auth.uid, ['admin']) ||
         (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'purchaser' &&
+          hasAnyRole(request.auth.uid, ['purchaser']) &&
           request.resource.data.budgetAllocated == resource.data.budgetAllocated &&
           request.resource.data.budgetSpent is number
         )
@@ -30,15 +44,15 @@ service cloud.firestore {
     match /purchaseOrders/{poId} {
       allow read: if true;
       allow create: if request.auth != null && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['director', 'admin']);
+        hasAnyRole(request.auth.uid, ['director', 'admin']);
       allow update: if request.auth != null && (
         // Creator can update their own POs (both existing and new data should match)
         ((resource.data.creatorId == request.auth.uid || request.resource.data.creatorId == request.auth.uid) && 
          (resource.data.status in ['draft', 'declined'] || request.resource.data.status in ['draft', 'pending_approval'])) ||
         // Admins can approve/decline
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        hasAnyRole(request.auth.uid, ['admin']) ||
         // Purchasers can mark as purchased
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'purchaser' && 
+        (hasAnyRole(request.auth.uid, ['purchaser']) && 
          resource.data.status in ['approved', 'pending_purchase'])
       );
       // Allow users to delete their own POs
@@ -49,7 +63,7 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow read: if true;
       allow write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['purchaser', 'admin'];
+        hasAnyRole(request.auth.uid, ['purchaser', 'admin']);
     }
     
     // Audit logs - read only for authenticated users
