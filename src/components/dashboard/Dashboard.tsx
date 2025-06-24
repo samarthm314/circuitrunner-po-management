@@ -9,12 +9,16 @@ import {
   CheckCircle, 
   TrendingUp,
   AlertTriangle,
-  Info
+  Info,
+  Building,
+  User
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDashboardStats, getRecentActivity } from '../../services/dashboardService';
 import { getSubOrganizations } from '../../services/subOrgService';
-import { SubOrganization } from '../../types';
+import { getTransactionsBySubOrg, getAllTransactions } from '../../services/transactionService';
+import { getPOsByUser } from '../../services/poService';
+import { SubOrganization, Transaction } from '../../types';
 import { GuestDashboard } from './GuestDashboard';
 
 interface DashboardStats {
@@ -31,6 +35,10 @@ interface ActivityItem {
   time: string;
 }
 
+// Keys for localStorage
+const SUB_ORG_FILTER_KEY = 'dashboard_subOrg_filter';
+const PO_SCOPE_FILTER_KEY = 'dashboard_po_scope_filter';
+
 export const Dashboard: React.FC = () => {
   const { userProfile, isGuest, currentUser } = useAuth();
   const navigate = useNavigate();
@@ -43,6 +51,19 @@ export const Dashboard: React.FC = () => {
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Persistent filter states
+  const [selectedSubOrg, setSelectedSubOrg] = useState<string>(() => {
+    return localStorage.getItem(SUB_ORG_FILTER_KEY) || 'all';
+  });
+  const [poScope, setPOScope] = useState<'organization' | 'authored'>(() => {
+    const saved = localStorage.getItem(PO_SCOPE_FILTER_KEY);
+    return (saved as 'organization' | 'authored') || 'organization';
+  });
+
+  // Filtered data states
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [filteredSubOrgs, setFilteredSubOrgs] = useState<SubOrganization[]>([]);
 
   // If user is a guest (including signed-in users with no roles), show the guest dashboard
   if (isGuest) {
@@ -50,35 +71,94 @@ export const Dashboard: React.FC = () => {
   }
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [dashboardStats, subOrganizations, activity] = await Promise.all([
-          getDashboardStats(),
-          getSubOrganizations(),
-          getRecentActivity()
-        ]);
-
-        setStats({
-          totalPOs: dashboardStats.totalPOs,
-          pendingPOs: dashboardStats.pendingPOs,
-          approvedPOs: dashboardStats.approvedPOs,
-          totalSpent: dashboardStats.totalSpent
-        });
-        
-        setSubOrgs(subOrganizations);
-        setRecentActivity(activity);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboardData();
-  }, []);
+  }, [poScope]);
 
-  const totalBudget = subOrgs.reduce((sum, org) => sum + org.budgetAllocated, 0);
-  const totalSpent = subOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
+  useEffect(() => {
+    fetchTransactionData();
+  }, [selectedSubOrg]);
+
+  // Save filter preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem(SUB_ORG_FILTER_KEY, selectedSubOrg);
+  }, [selectedSubOrg]);
+
+  useEffect(() => {
+    localStorage.setItem(PO_SCOPE_FILTER_KEY, poScope);
+  }, [poScope]);
+
+  const fetchDashboardData = async () => {
+    try {
+      let dashboardStats;
+      
+      if (poScope === 'authored' && currentUser) {
+        // Get user's own POs for stats
+        const userPOs = await getPOsByUser(currentUser.uid);
+        dashboardStats = {
+          totalPOs: userPOs.length,
+          pendingPOs: userPOs.filter(po => po.status === 'pending_approval').length,
+          approvedPOs: userPOs.filter(po => po.status === 'approved').length,
+          totalSpent: userPOs.filter(po => po.status === 'purchased').reduce((sum, po) => sum + po.totalAmount, 0)
+        };
+      } else {
+        // Get organization-wide stats
+        dashboardStats = await getDashboardStats();
+      }
+
+      const [subOrganizations, activity] = await Promise.all([
+        getSubOrganizations(),
+        getRecentActivity()
+      ]);
+
+      setStats(dashboardStats);
+      setSubOrgs(subOrganizations);
+      setRecentActivity(activity);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTransactionData = async () => {
+    try {
+      let transactions: Transaction[] = [];
+      
+      if (selectedSubOrg === 'all') {
+        transactions = await getAllTransactions();
+        setFilteredSubOrgs(subOrgs);
+      } else {
+        transactions = await getTransactionsBySubOrg(selectedSubOrg);
+        const selectedOrg = subOrgs.find(org => org.id === selectedSubOrg);
+        setFilteredSubOrgs(selectedOrg ? [selectedOrg] : []);
+      }
+      
+      setFilteredTransactions(transactions);
+    } catch (error) {
+      console.error('Error fetching transaction data:', error);
+    }
+  };
+
+  // Update filtered data when subOrgs change
+  useEffect(() => {
+    if (selectedSubOrg === 'all') {
+      setFilteredSubOrgs(subOrgs);
+    } else {
+      const selectedOrg = subOrgs.find(org => org.id === selectedSubOrg);
+      setFilteredSubOrgs(selectedOrg ? [selectedOrg] : []);
+    }
+  }, [subOrgs, selectedSubOrg]);
+
+  const handleSubOrgChange = (value: string) => {
+    setSelectedSubOrg(value);
+  };
+
+  const handlePOScopeChange = (value: 'organization' | 'authored') => {
+    setPOScope(value);
+  };
+
+  const totalBudget = filteredSubOrgs.reduce((sum, org) => sum + org.budgetAllocated, 0);
+  const totalSpent = filteredSubOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
   const budgetRemaining = totalBudget - totalSpent;
 
   const handlePendingPOsClick = () => {
@@ -90,7 +170,9 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleTotalPOsClick = () => {
-    if (userProfile?.role === 'admin' || userProfile?.role === 'purchaser') {
+    if (poScope === 'authored') {
+      navigate('/my-pos');
+    } else if (userProfile?.role === 'admin' || userProfile?.role === 'purchaser') {
       navigate('/all-pos');
     } else {
       navigate('/my-pos');
@@ -99,7 +181,7 @@ export const Dashboard: React.FC = () => {
 
   const isPendingPOsClickable = userProfile?.role === 'admin' || userProfile?.role === 'purchaser';
 
-  // Get the appropriate label and count for pending POs based on role
+  // Get the appropriate label and count for pending POs based on role and scope
   const getPendingPOsInfo = () => {
     if (userProfile?.role === 'admin') {
       return {
@@ -115,7 +197,7 @@ export const Dashboard: React.FC = () => {
       };
     } else {
       return {
-        label: 'Pending POs',
+        label: poScope === 'authored' ? 'My Pending POs' : 'Pending POs',
         count: stats.pendingPOs,
         description: 'POs awaiting approval'
       };
@@ -141,6 +223,57 @@ export const Dashboard: React.FC = () => {
         </Badge>
       </div>
 
+      {/* Filter Controls */}
+      <Card>
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              <Building className="h-4 w-4 inline mr-1" />
+              Budget View
+            </label>
+            <select
+              value={selectedSubOrg}
+              onChange={(e) => handleSubOrgChange(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+              {subOrgs.map(org => (
+                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                  {org.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {selectedSubOrg === 'all' 
+                ? 'Showing budget data for all sub-organizations' 
+                : `Showing budget data for ${subOrgs.find(org => org.id === selectedSubOrg)?.name || 'selected organization'}`
+              }
+            </p>
+          </div>
+          
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              <User className="h-4 w-4 inline mr-1" />
+              PO Scope
+            </label>
+            <select
+              value={poScope}
+              onChange={(e) => handlePOScopeChange(e.target.value as 'organization' | 'authored')}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="organization" className="text-gray-100 bg-gray-700">Organization-wide</option>
+              <option value="authored" className="text-gray-100 bg-gray-700">My POs Only</option>
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              {poScope === 'organization' 
+                ? 'Showing PO statistics for the entire organization' 
+                : 'Showing statistics for POs you have created'
+              }
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="p-4 sm:p-6">
@@ -149,7 +282,9 @@ export const Dashboard: React.FC = () => {
               <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-green-400" />
             </div>
             <div className="ml-3 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-400">Total Budget</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-400">
+                {selectedSubOrg === 'all' ? 'Total Budget' : 'Budget'}
+              </p>
               <p className="text-lg sm:text-2xl font-bold text-gray-100 truncate">
                 ${totalBudget.toLocaleString()}
               </p>
@@ -202,7 +337,9 @@ export const Dashboard: React.FC = () => {
               <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />
             </div>
             <div className="ml-3 sm:ml-4 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-gray-400">Total POs</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-400">
+                {poScope === 'authored' ? 'My POs' : 'Total POs'}
+              </p>
               <p className="text-lg sm:text-2xl font-bold text-gray-100">{stats.totalPOs}</p>
               <p className="text-xs text-purple-400 mt-1 truncate">Click to view all</p>
             </div>
@@ -211,57 +348,97 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Budget by Sub-Organization */}
+        {/* Budget by Sub-Organization or Transactions */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">Budget by Sub-Organization</CardTitle>
+            <CardTitle className="text-base sm:text-lg">
+              {selectedSubOrg === 'all' ? 'Budget by Sub-Organization' : 'Recent Transactions'}
+            </CardTitle>
           </CardHeader>
           <div className="space-y-3 sm:space-y-4">
-            {subOrgs.slice(0, 8).map((org) => {
-              const utilization = org.budgetAllocated > 0 ? (org.budgetSpent / org.budgetAllocated) * 100 : 0;
-              const isOverBudget = utilization > 100;
-              const isNearLimit = utilization > 80;
-              const remaining = org.budgetAllocated - org.budgetSpent;
+            {selectedSubOrg === 'all' ? (
+              // Show budget breakdown when viewing all organizations
+              subOrgs.slice(0, 8).map((org) => {
+                const utilization = org.budgetAllocated > 0 ? (org.budgetSpent / org.budgetAllocated) * 100 : 0;
+                const isOverBudget = utilization > 100;
+                const isNearLimit = utilization > 80;
+                const remaining = org.budgetAllocated - org.budgetSpent;
 
-              return (
-                <div key={org.id} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2 min-w-0">
-                      <span className="font-medium text-gray-100 text-sm sm:text-base truncate">{org.name}</span>
-                      {isOverBudget && (
-                        <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-400 flex-shrink-0" />
-                      )}
+                return (
+                  <div key={org.id} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <span className="font-medium text-gray-100 text-sm sm:text-base truncate">{org.name}</span>
+                        {isOverBudget && (
+                          <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-400 flex-shrink-0" />
+                        )}
+                      </div>
+                      <span className="text-xs sm:text-sm text-gray-300 whitespace-nowrap ml-2">
+                        ${org.budgetSpent.toLocaleString()} / ${org.budgetAllocated.toLocaleString()}
+                      </span>
                     </div>
-                    <span className="text-xs sm:text-sm text-gray-300 whitespace-nowrap ml-2">
-                      ${org.budgetSpent.toLocaleString()} / ${org.budgetAllocated.toLocaleString()}
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isOverBudget 
+                            ? 'bg-red-500' 
+                            : isNearLimit 
+                              ? 'bg-yellow-500' 
+                              : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(utilization, 100)}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400">
+                      <span>{utilization.toFixed(1)}% utilized</span>
+                      <span className={utilization > 100 ? 'text-red-400 font-medium' : 'text-gray-300'}>
+                        ${remaining.toLocaleString()} remaining
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              // Show recent transactions for selected organization
+              filteredTransactions.slice(0, 6).length > 0 ? (
+                filteredTransactions.slice(0, 6).map((transaction) => (
+                  <div key={transaction.id} className="flex justify-between items-center p-3 bg-gray-700 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-100 truncate">{transaction.description}</p>
+                      <p className="text-xs text-gray-400">
+                        {transaction.postDate.toLocaleDateString()}
+                        {transaction.notes && ` • ${transaction.notes}`}
+                      </p>
+                    </div>
+                    <span className="text-sm font-medium text-red-400 ml-2">
+                      ${transaction.debitAmount.toFixed(2)}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        isOverBudget 
-                          ? 'bg-red-500' 
-                          : isNearLimit 
-                            ? 'bg-yellow-500' 
-                            : 'bg-green-500'
-                      }`}
-                      style={{ width: `${Math.min(utilization, 100)}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-400">
-                    <span>{utilization.toFixed(1)}% utilized</span>
-                    <span className={utilization > 100 ? 'text-red-400 font-medium' : 'text-gray-300'}>
-                      ${remaining.toLocaleString()} remaining
-                    </span>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-gray-400 text-sm">No transactions found</p>
+                  <p className="text-gray-500 text-xs mt-1">
+                    No spending recorded for this organization
+                  </p>
                 </div>
-              );
-            })}
-            {subOrgs.length > 8 && (
+              )
+            )}
+            {selectedSubOrg === 'all' && subOrgs.length > 8 && (
               <div className="text-center pt-2">
                 <span className="text-sm text-gray-400">
                   +{subOrgs.length - 8} more organizations
                 </span>
+              </div>
+            )}
+            {selectedSubOrg !== 'all' && filteredTransactions.length > 6 && (
+              <div className="text-center pt-2">
+                <button 
+                  onClick={() => navigate('/transactions')}
+                  className="text-sm text-green-400 hover:text-green-300 transition-colors"
+                >
+                  View all {filteredTransactions.length} transactions →
+                </button>
               </div>
             )}
           </div>
@@ -294,6 +471,29 @@ export const Dashboard: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Filter Summary */}
+      {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
+        <Card className="border-blue-600 bg-blue-900/30">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div>
+              <h3 className="text-blue-300 font-medium mb-1">Active Filters</h3>
+              <div className="text-blue-200 text-sm space-y-1">
+                {selectedSubOrg !== 'all' && (
+                  <p>• Budget view filtered to: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
+                )}
+                {poScope !== 'organization' && (
+                  <p>• PO statistics showing: <strong>Your authored POs only</strong></p>
+                )}
+                <p className="text-xs text-blue-300 mt-2">
+                  These filter preferences are saved and will persist across login sessions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
