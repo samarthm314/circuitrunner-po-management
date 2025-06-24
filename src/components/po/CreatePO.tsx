@@ -622,7 +622,7 @@ export const CreatePO: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-400 mt-1">Type digits only (no decimal)</p>
                   </div>
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-4">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
                     <div className="flex">
                       <input
