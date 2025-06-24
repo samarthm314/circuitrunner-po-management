@@ -19,9 +19,9 @@ service cloud.firestore {
       );
     }
     
-    // Purchase Orders - complex rules based on role and status
+    // Purchase Orders - allow read for everyone (including guests), complex rules for write operations based on role and status
     match /purchaseOrders/{poId} {
-      allow read: if request.auth != null;
+      allow read: if true;
       allow create: if request.auth != null && 
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['director', 'admin']);
       allow update: if request.auth != null && (
