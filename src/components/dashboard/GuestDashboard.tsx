@@ -175,7 +175,8 @@ export const GuestDashboard: React.FC = () => {
             </p>
           </div>
           
-          <div className="flex items-end">
+          {/* Clear Filter Button - Centered */}
+          <div className="flex items-end justify-center lg:justify-start">
             {selectedSubOrg !== 'all' && (
               <button
                 onClick={clearFilters}

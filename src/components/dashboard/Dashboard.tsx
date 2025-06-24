@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   Info,
   Building,
-  User
+  User,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDashboardStats, getRecentActivity } from '../../services/dashboardService';
@@ -157,6 +158,11 @@ export const Dashboard: React.FC = () => {
     setPOScope(value);
   };
 
+  const clearFilters = () => {
+    setSelectedSubOrg('all');
+    setPOScope('organization');
+  };
+
   const totalBudget = filteredSubOrgs.reduce((sum, org) => sum + org.budgetAllocated, 0);
   const totalSpent = filteredSubOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
   const budgetRemaining = totalBudget - totalSpent;
@@ -270,6 +276,19 @@ export const Dashboard: React.FC = () => {
                 : 'Showing statistics for POs you have created'
               }
             </p>
+          </div>
+
+          {/* Clear Filters Button - Centered */}
+          <div className="flex items-end justify-center lg:justify-start">
+            {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear Filters
+              </button>
+            )}
           </div>
         </div>
       </Card>
