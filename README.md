@@ -6,6 +6,24 @@ A comprehensive web application for managing purchase orders, budgets, and trans
 
 **Production URL:** [https://dulcet-froyo-ec1a95.netlify.app](https://dulcet-froyo-ec1a95.netlify.app)
 
+## 📸 Screenshots
+
+### Dashboard Overview
+<!-- Add screenshot of the main dashboard here -->
+*The main dashboard provides an overview of budget utilization, pending POs, and recent activity*
+
+### Purchase Order Creation
+<!-- Add screenshot of the Create PO page here -->
+*Intuitive PO creation with line items, vendor links, and budget tracking*
+
+### Budget Management
+<!-- Add screenshot of the Budget Management page here -->
+*Real-time budget tracking with visual indicators and alerts*
+
+### Transaction Management
+<!-- Add screenshot of the Transactions page here -->
+*Excel upload, receipt management, and transaction allocation*
+
 ## 📋 Table of Contents
 
 - [Overview](#overview)
