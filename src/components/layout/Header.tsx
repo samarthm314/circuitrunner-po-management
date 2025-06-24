@@ -34,10 +34,10 @@ export const Header: React.FC = () => {
               className="h-8 w-8"
             />
             <h1 className="ml-2 text-xl font-bold text-gray-100 whitespace-nowrap">
-              CircuitRunners PO System
+              CircuitRunners Finances
             </h1>
             {isGuest && (
-              <div className="ml-12">
+              <div className="ml-10">
                 <Badge variant="info" size="sm">
                   <Eye className="h-3 w-3 mr-1" />
                   Guest Mode
