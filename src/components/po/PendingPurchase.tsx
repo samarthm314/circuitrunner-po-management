@@ -2,19 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { ExternalLink, ShoppingCart, Eye, Receipt, Trash2, MessageSquare } from 'lucide-react';
 import { getPOsByStatus, updatePOStatus, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useModal } from '../../hooks/useModal';
 
 export const PendingPurchase: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
+  const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
@@ -70,7 +72,11 @@ export const PendingPurchase: React.FC = () => {
       setPurchaserComment('');
     } catch (error) {
       console.error('Error marking PO as purchased:', error);
-      alert('Error marking PO as purchased. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error marking PO as purchased. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setActionLoading(null);
     }
@@ -82,20 +88,34 @@ export const PendingPurchase: React.FC = () => {
   };
 
   const handleDeletePO = async (poId: string, poName: string) => {
-    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Purchase Order',
+      message: `Are you sure you want to delete "${poName}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
 
-    setDeleteLoading(poId);
+    if (!confirmed) return;
+
+    setConfirmLoading(true);
     try {
       await deletePO(poId);
       await fetchPendingPurchasePOs(); // Refresh the list
-      alert('Purchase Order deleted successfully');
+      await showAlert({
+        title: 'Success',
+        message: 'Purchase Order deleted successfully',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error deleting PO:', error);
-      alert('Error deleting Purchase Order. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting Purchase Order. Please try again.',
+        variant: 'error'
+      });
     } finally {
-      setDeleteLoading(null);
+      setConfirmLoading(false);
     }
   };
 
@@ -182,8 +202,7 @@ export const PendingPurchase: React.FC = () => {
                         variant="danger" 
                         size="sm"
                         onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
-                        loading={deleteLoading === po.id}
-                        disabled={deleteLoading !== null || actionLoading !== null}
+                        disabled={actionLoading !== null}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete
@@ -294,7 +313,7 @@ export const PendingPurchase: React.FC = () => {
                           <Button
                             onClick={() => handleMarkAsPurchased(po.id)}
                             loading={actionLoading === po.id}
-                            disabled={actionLoading !== null || deleteLoading !== null}
+                            disabled={actionLoading !== null}
                             className="w-full"
                           >
                             <ShoppingCart className="h-4 w-4 mr-2" />
@@ -409,6 +428,27 @@ export const PendingPurchase: React.FC = () => {
           onPOUpdated={handlePOUpdated}
         />
       )}
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.options.title}
+        message={confirmModal.options.message}
+        confirmText={confirmModal.options.confirmText}
+        cancelText={confirmModal.options.cancelText}
+        variant={confirmModal.options.variant}
+        loading={confirmModal.loading}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };

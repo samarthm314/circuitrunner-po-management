@@ -3,9 +3,11 @@ import { X, ExternalLink, Calendar, User, Building, DollarSign, Download, Messag
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { AlertModal } from '../ui/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { updatePOStatus } from '../../services/poService';
 import { format } from 'date-fns';
+import { useModal } from '../../hooks/useModal';
 import * as XLSX from 'xlsx';
 
 interface PODetailsModalProps {
@@ -24,6 +26,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
   isGuestView = false 
 }) => {
   const { userProfile, isGuest, currentUser } = useAuth();
+  const { alertModal, showAlert, closeAlert } = useModal();
   const [checkedItems, setCheckedItems] = useState<{ [key: string]: boolean }>({});
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -104,7 +107,11 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
           ...prev,
           [itemIndex]: !newCheckedState
         }));
-        alert('Error updating PO status. Please try again.');
+        await showAlert({
+          title: 'Error',
+          message: 'Error updating PO status. Please try again.',
+          variant: 'error'
+        });
       } finally {
         setUpdatingStatus(false);
       }
@@ -206,7 +213,11 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       
     } catch (error) {
       console.error('Error generating PO summary:', error);
-      alert('Error generating PO summary. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error generating PO summary. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setDownloadLoading(false);
     }
@@ -532,6 +543,15 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };

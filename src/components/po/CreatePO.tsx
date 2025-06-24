@@ -3,17 +3,20 @@ import { Plus, Trash2, ExternalLink, Save, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { LineItem, SubOrganization } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
 import { createPO, updatePO, getPOById } from '../../services/poService';
 import { getSubOrganizations } from '../../services/subOrgService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useModal } from '../../hooks/useModal';
 
 export const CreatePO: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('edit');
+  const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   
   const [subOrganizations, setSubOrganizations] = useState<SubOrganization[]>([]);
   const [poName, setPOName] = useState('');
@@ -78,12 +81,20 @@ export const CreatePO: React.FC = () => {
         });
         setPriceInputs(newPriceInputs);
       } else {
-        alert('PO not found or cannot be edited');
+        await showAlert({
+          title: 'Error',
+          message: 'PO not found or cannot be edited',
+          variant: 'error'
+        });
         navigate('/my-pos');
       }
     } catch (error) {
       console.error('Error loading PO for editing:', error);
-      alert('Error loading PO for editing');
+      await showAlert({
+        title: 'Error',
+        message: 'Error loading PO for editing',
+        variant: 'error'
+      });
       navigate('/my-pos');
     } finally {
       setLoading(false);
@@ -185,14 +196,22 @@ export const CreatePO: React.FC = () => {
     });
   };
 
-  const validateForm = (isDraft: boolean = false) => {
+  const validateForm = async (isDraft: boolean = false) => {
     if (!poName.trim()) {
-      alert('Please enter a name for this Purchase Order');
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Please enter a name for this Purchase Order',
+        variant: 'error'
+      });
       return false;
     }
 
     if (!selectedOrg) {
-      alert('Please select a sub-organization');
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Please select a sub-organization',
+        variant: 'error'
+      });
       return false;
     }
 
@@ -203,12 +222,20 @@ export const CreatePO: React.FC = () => {
       );
 
       if (validLineItems.length === 0) {
-        alert('Please add at least one valid line item');
+        await showAlert({
+          title: 'Validation Error',
+          message: 'Please add at least one valid line item',
+          variant: 'error'
+        });
         return false;
       }
 
       if (isOverBudget && !overBudgetJustification.trim()) {
-        alert('Please provide justification for exceeding the budget');
+        await showAlert({
+          title: 'Budget Justification Required',
+          message: 'Please provide justification for exceeding the budget',
+          variant: 'warning'
+        });
         return false;
       }
     }
@@ -219,7 +246,7 @@ export const CreatePO: React.FC = () => {
   const handleSaveDraft = async () => {
     if (!currentUser || !userProfile) return;
 
-    if (!validateForm(true)) return;
+    if (!(await validateForm(true))) return;
 
     setLoading(true);
 
@@ -252,17 +279,29 @@ export const CreatePO: React.FC = () => {
       if (isEditing && editingPOId) {
         // Update existing draft
         await updatePO(editingPOId, poData);
-        alert('Draft updated successfully!');
+        await showAlert({
+          title: 'Success',
+          message: 'Draft updated successfully!',
+          variant: 'success'
+        });
       } else {
         // Create new draft
         await createPO(poData);
-        alert('Draft saved successfully!');
+        await showAlert({
+          title: 'Success',
+          message: 'Draft saved successfully!',
+          variant: 'success'
+        });
       }
 
       navigate('/my-pos');
     } catch (error) {
       console.error('Error saving draft:', error);
-      alert('Error saving draft. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error saving draft. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -273,7 +312,7 @@ export const CreatePO: React.FC = () => {
     
     if (!currentUser || !userProfile || !selectedOrg) return;
 
-    if (!validateForm(false)) return;
+    if (!(await validateForm(false))) return;
 
     setLoading(true);
 
@@ -316,20 +355,36 @@ export const CreatePO: React.FC = () => {
         await updatePO(editingPOId, poData);
         
         if (originalPOStatus === 'declined') {
-          alert('Purchase Order updated and resubmitted successfully!\n\nYour PO has been sent back for admin review.\nLine items have been sorted alphabetically by vendor for easy review.');
+          await showAlert({
+            title: 'Success',
+            message: 'Purchase Order updated and resubmitted successfully!\n\nYour PO has been sent back for admin review.\nLine items have been sorted alphabetically by vendor for easy review.',
+            variant: 'success'
+          });
         } else {
-          alert('Purchase Order updated and submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+          await showAlert({
+            title: 'Success',
+            message: 'Purchase Order updated and submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.',
+            variant: 'success'
+          });
         }
       } else {
         // Create new PO
         await createPO(poData);
-        alert('Purchase Order submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.');
+        await showAlert({
+          title: 'Success',
+          message: 'Purchase Order submitted successfully!\n\nLine items have been sorted alphabetically by vendor for easy review.',
+          variant: 'success'
+        });
       }
 
       navigate('/my-pos');
     } catch (error) {
       console.error('Error submitting PO:', error);
-      alert('Error submitting Purchase Order. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error submitting Purchase Order. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -666,6 +721,27 @@ export const CreatePO: React.FC = () => {
           </Button>
         </div>
       </form>
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.options.title}
+        message={confirmModal.options.message}
+        confirmText={confirmModal.options.confirmText}
+        cancelText={confirmModal.options.cancelText}
+        variant={confirmModal.options.variant}
+        loading={confirmModal.loading}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };

@@ -2,19 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { ExternalLink, Check, X, MessageSquare, Eye, Trash2 } from 'lucide-react';
 import { getPOsByStatus, updatePOStatus, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
 import { useAuth } from '../../contexts/AuthContext';
+import { useModal } from '../../hooks/useModal';
 
 export const PendingApproval: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
+  const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [comments, setComments] = useState<{ [key: string]: string }>({});
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,7 +53,11 @@ export const PendingApproval: React.FC = () => {
       setComments(prev => ({ ...prev, [poId]: '' }));
     } catch (error) {
       console.error('Error approving PO:', error);
-      alert('Error approving PO. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error approving PO. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setActionLoading(null);
     }
@@ -59,7 +65,11 @@ export const PendingApproval: React.FC = () => {
 
   const handleDecline = async (poId: string) => {
     if (!comments[poId]?.trim()) {
-      alert('Please provide a reason for declining this PO');
+      await showAlert({
+        title: 'Comment Required',
+        message: 'Please provide a reason for declining this PO',
+        variant: 'warning'
+      });
       return;
     }
 
@@ -70,27 +80,45 @@ export const PendingApproval: React.FC = () => {
       setComments(prev => ({ ...prev, [poId]: '' }));
     } catch (error) {
       console.error('Error declining PO:', error);
-      alert('Error declining PO. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error declining PO. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleDeletePO = async (poId: string, poName: string) => {
-    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Purchase Order',
+      message: `Are you sure you want to delete "${poName}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
 
-    setDeleteLoading(poId);
+    if (!confirmed) return;
+
+    setConfirmLoading(true);
     try {
       await deletePO(poId);
       await fetchPendingPOs(); // Refresh the list
-      alert('Purchase Order deleted successfully');
+      await showAlert({
+        title: 'Success',
+        message: 'Purchase Order deleted successfully',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error deleting PO:', error);
-      alert('Error deleting Purchase Order. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting Purchase Order. Please try again.',
+        variant: 'error'
+      });
     } finally {
-      setDeleteLoading(null);
+      setConfirmLoading(false);
     }
   };
 
@@ -176,8 +204,7 @@ export const PendingApproval: React.FC = () => {
                       variant="danger" 
                       size="sm"
                       onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
-                      loading={deleteLoading === po.id}
-                      disabled={deleteLoading !== null || actionLoading !== null}
+                      disabled={actionLoading !== null}
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
@@ -256,7 +283,7 @@ export const PendingApproval: React.FC = () => {
                         variant="danger"
                         onClick={() => handleDecline(po.id)}
                         loading={actionLoading === po.id}
-                        disabled={actionLoading !== null || deleteLoading !== null}
+                        disabled={actionLoading !== null}
                       >
                         <X className="h-4 w-4 mr-1" />
                         Decline
@@ -264,7 +291,7 @@ export const PendingApproval: React.FC = () => {
                       <Button
                         onClick={() => handleApprove(po.id)}
                         loading={actionLoading === po.id}
-                        disabled={actionLoading !== null || deleteLoading !== null}
+                        disabled={actionLoading !== null}
                       >
                         <Check className="h-4 w-4 mr-1" />
                         Approve
@@ -287,6 +314,27 @@ export const PendingApproval: React.FC = () => {
           onPOUpdated={handlePOUpdated}
         />
       )}
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.options.title}
+        message={confirmModal.options.message}
+        confirmText={confirmModal.options.confirmText}
+        cancelText={confirmModal.options.cancelText}
+        variant={confirmModal.options.variant}
+        loading={confirmModal.loading}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };
