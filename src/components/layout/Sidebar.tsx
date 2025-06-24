@@ -26,7 +26,7 @@ const navigation: NavItem[] = [
   { name: 'Pending Approval', href: '/pending-approval', icon: CheckCircle, roles: ['admin'] },
   { name: 'Pending Purchase', href: '/pending-purchase', icon: CreditCard, roles: ['purchaser'] },
   { name: 'All POs', href: '/all-pos', icon: Archive, roles: ['admin', 'purchaser', 'guest'] },
-  { name: 'Transactions', href: '/transactions', icon: CreditCard, roles: ['admin', 'purchaser'] },
+  { name: 'Transactions', href: '/transactions', icon: CreditCard, roles: ['admin', 'purchaser', 'guest'] },
   { name: 'Budget Management', href: '/budget-management', icon: Settings, roles: ['admin'] },
 ];
 
