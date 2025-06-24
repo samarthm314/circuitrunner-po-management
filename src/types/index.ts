@@ -56,6 +56,8 @@ export interface Transaction {
   receiptUrl?: string;
   receiptFileName?: string;
   notes?: string;
+  linkedPOId?: string; // Added linked PO ID field
+  linkedPOName?: string; // Added linked PO name field
   createdAt: Date;
   updatedAt: Date;
 }

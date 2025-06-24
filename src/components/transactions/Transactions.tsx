@@ -12,9 +12,11 @@ import {
   FileText,
   DollarSign,
   Calendar,
-  Building
+  Building,
+  Link,
+  Search
 } from 'lucide-react';
-import { Transaction, SubOrganization } from '../../types';
+import { Transaction, SubOrganization, PurchaseOrder } from '../../types';
 import { 
   getAllTransactions, 
   updateTransaction, 
@@ -25,14 +27,16 @@ import {
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
+import { getPOsByStatus } from '../../services/poService';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, isGuest } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
+  const [purchasedPOs, setPurchasedPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Transaction>>({});
@@ -40,6 +44,11 @@ export const Transactions: React.FC = () => {
   const [processingExcel, setProcessingExcel] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [subOrgFilter, setSubOrgFilter] = useState<string>('all');
+  
+  // PO Selection Modal State
+  const [showPOModal, setShowPOModal] = useState<string | null>(null);
+  const [poSearchTerm, setPOSearchTerm] = useState('');
+  const [linkingPO, setLinkingPO] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -62,13 +71,15 @@ export const Transactions: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [transactionsData, subOrgsData] = await Promise.all([
+      const [transactionsData, subOrgsData, purchasedPOsData] = await Promise.all([
         getAllTransactions(),
-        getSubOrganizations()
+        getSubOrganizations(),
+        getPOsByStatus('purchased')
       ]);
       setTransactions(transactionsData);
       setFilteredTransactions(transactionsData);
       setSubOrgs(subOrgsData);
+      setPurchasedPOs(purchasedPOsData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -147,6 +158,7 @@ export const Transactions: React.FC = () => {
         'Status': transaction.status,
         'Notes': transaction.notes || '',
         'Receipt': transaction.receiptUrl ? 'Yes' : 'No',
+        'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : 'None',
         'Created At': transaction.createdAt.toLocaleDateString()
       }));
 
@@ -298,6 +310,57 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const handleSelectPO = (transactionId: string) => {
+    setShowPOModal(transactionId);
+    setPOSearchTerm('');
+  };
+
+  const handleLinkPO = async (transactionId: string, poId: string) => {
+    setLinkingPO(true);
+    try {
+      const selectedPO = purchasedPOs.find(po => po.id === poId);
+      await updateTransaction(transactionId, {
+        linkedPOId: poId,
+        linkedPOName: selectedPO?.name || `PO #${poId.slice(-6).toUpperCase()}`
+      });
+
+      await fetchData();
+      setShowPOModal(null);
+    } catch (error) {
+      console.error('Error linking PO:', error);
+      alert('Error linking PO. Please try again.');
+    } finally {
+      setLinkingPO(false);
+    }
+  };
+
+  const handleUnlinkPO = async (transactionId: string) => {
+    if (!confirm('Are you sure you want to unlink this PO?')) return;
+
+    try {
+      await updateTransaction(transactionId, {
+        linkedPOId: null,
+        linkedPOName: null
+      });
+
+      await fetchData();
+    } catch (error) {
+      console.error('Error unlinking PO:', error);
+      alert('Error unlinking PO. Please try again.');
+    }
+  };
+
+  const filteredPOs = purchasedPOs.filter(po => {
+    if (!poSearchTerm) return true;
+    const searchLower = poSearchTerm.toLowerCase();
+    return (
+      po.name?.toLowerCase().includes(searchLower) ||
+      po.id.toLowerCase().includes(searchLower) ||
+      po.creatorName.toLowerCase().includes(searchLower) ||
+      po.subOrgName.toLowerCase().includes(searchLower)
+    );
+  });
+
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
   const allocatedTransactions = filteredTransactions.filter(t => t.subOrgId).length;
   const unallocatedAmount = filteredTransactions
@@ -324,28 +387,32 @@ export const Transactions: React.FC = () => {
             accept=".xlsx,.xls"
             onChange={handleExcelUpload}
             className="hidden"
-            disabled={processingExcel}
+            disabled={processingExcel || isGuest}
           />
           
           {/* Visible upload button */}
-          <Button 
-            onClick={triggerFileUpload}
-            disabled={processingExcel} 
-            loading={processingExcel}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Excel
-          </Button>
+          {!isGuest && (
+            <Button 
+              onClick={triggerFileUpload}
+              disabled={processingExcel} 
+              loading={processingExcel}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Excel
+            </Button>
+          )}
           
           <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
 
-          <Button variant="outline" onClick={handleRecalculateBudgets}>
-            <Building className="h-4 w-4 mr-2" />
-            Recalculate Budgets
-          </Button>
+          {!isGuest && (
+            <Button variant="outline" onClick={handleRecalculateBudgets}>
+              <Building className="h-4 w-4 mr-2" />
+              Recalculate Budgets
+            </Button>
+          )}
         </div>
       </div>
 
@@ -444,7 +511,10 @@ export const Transactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
-                <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
+                {!isGuest && (
+                  <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -493,7 +563,7 @@ export const Transactions: React.FC = () => {
                         accept=".pdf,.jpg,.jpeg,.png"
                         onChange={(e) => handleReceiptFileChange(transaction.id, e)}
                         className="hidden"
-                        disabled={uploadingReceipt === transaction.id}
+                        disabled={uploadingReceipt === transaction.id || isGuest}
                       />
                       
                       {transaction.receiptUrl ? (
@@ -507,25 +577,29 @@ export const Transactions: React.FC = () => {
                           >
                             <Download className="h-4 w-4" />
                           </a>
-                          <button
-                            onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
-                            className="text-red-400 hover:text-red-300"
-                            title="Delete Receipt"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!isGuest && (
+                            <button
+                              onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
+                              className="text-red-400 hover:text-red-300"
+                              title="Delete Receipt"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => triggerReceiptUpload(transaction.id)}
-                          disabled={uploadingReceipt === transaction.id}
-                          loading={uploadingReceipt === transaction.id}
-                        >
-                          <Upload className="h-3 w-3 mr-1" />
-                          Upload
-                        </Button>
+                        !isGuest && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => triggerReceiptUpload(transaction.id)}
+                            disabled={uploadingReceipt === transaction.id}
+                            loading={uploadingReceipt === transaction.id}
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                        )
                       )}
                     </td>
                     <td className="py-4 px-4">
@@ -544,46 +618,77 @@ export const Transactions: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="py-4 px-4 text-center">
-                      {isEditing ? (
-                        <div className="flex items-center justify-center space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => saveEdit(transaction.id)}
-                            loading={savingEdit}
-                            disabled={savingEdit}
-                          >
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={cancelEdit}
-                            disabled={savingEdit}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                    <td className="py-4 px-4">
+                      {transaction.linkedPOId ? (
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="info" size="sm">
+                            {transaction.linkedPOName || `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}`}
+                          </Badge>
+                          {!isGuest && (
+                            <button
+                              onClick={() => handleUnlinkPO(transaction.id)}
+                              className="text-red-400 hover:text-red-300"
+                              title="Unlink PO"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center space-x-2">
+                        !isGuest && (
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            onClick={() => startEdit(transaction)}
+                            onClick={() => handleSelectPO(transaction.id)}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Link className="h-3 w-3 mr-1" />
+                            Select PO
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        )
                       )}
                     </td>
+                    {!isGuest && (
+                      <td className="py-4 px-4 text-center">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => saveEdit(transaction.id)}
+                              loading={savingEdit}
+                              disabled={savingEdit}
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelEdit}
+                              disabled={savingEdit}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEdit(transaction)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTransaction(transaction.id)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -602,6 +707,85 @@ export const Transactions: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* PO Selection Modal */}
+      {showPOModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden border border-gray-700">
+            <div className="p-6 border-b border-gray-700">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold text-gray-100">Select Purchase Order</h3>
+                <button
+                  onClick={() => setShowPOModal(null)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-400" />
+                </button>
+              </div>
+              
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by PO name, ID, creator, or sub-organization..."
+                  value={poSearchTerm}
+                  onChange={(e) => setPOSearchTerm(e.target.value)}
+                  className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                />
+              </div>
+            </div>
+
+            <div className="max-h-96 overflow-y-auto p-6">
+              {filteredPOs.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-400">No purchased POs found</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {poSearchTerm ? 'Try adjusting your search terms' : 'No POs have been marked as purchased yet'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredPOs.map((po) => (
+                    <div
+                      key={po.id}
+                      className="flex justify-between items-center p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h4 className="font-medium text-gray-100">
+                            {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
+                          </h4>
+                          <Badge variant="success" size="sm">Purchased</Badge>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
+                          <div>
+                            <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-200">Sub-Org:</span> {po.subOrgName}
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-200">Amount:</span> ${po.totalAmount.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleLinkPO(showPOModal, po.id)}
+                        loading={linkingPO}
+                        disabled={linkingPO}
+                        size="sm"
+                      >
+                        <Link className="h-4 w-4 mr-1" />
+                        Link
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Instructions */}
       <Card>
@@ -624,6 +808,7 @@ export const Transactions: React.FC = () => {
             <li>Transaction dates are parsed from the spreadsheet, not the upload date</li>
             <li>After import, assign transactions to sub-organizations for budget tracking</li>
             <li>Budget spent amounts are automatically recalculated when transactions are allocated</li>
+            <li>Link transactions to purchased POs for better tracking and reporting</li>
           </ul>
         </div>
       </Card>
