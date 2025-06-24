@@ -132,24 +132,51 @@ The CircuitRunners PO System streamlines the purchase order workflow for robotic
    npm install
    ```
 
-3. **Configure Firebase**
-   - Update `src/config/firebase.ts` with your Firebase configuration
+3. **Configure Environment Variables**
+   ```bash
+   # Copy the example environment file
+   cp .env.example .env
+   
+   # Edit .env with your Firebase configuration
+   # Get these values from your Firebase project settings
+   ```
+
+4. **Configure Firebase**
+   - Create a Firebase project at https://console.firebase.google.com
+   - Enable Firestore, Authentication, and Storage
    - Set up Firestore security rules from `firestore.rules`
    - Enable Email/Password authentication in Firebase Console
+   - Copy your Firebase config values to the `.env` file
 
-4. **Initialize Data**
+5. **Initialize Data**
    - The system will automatically create default sub-organizations on first run
    - Create user accounts through Firebase Console with appropriate roles
 
-5. **Start development server**
+6. **Start development server**
    ```bash
    npm run dev
    ```
 
-6. **Build for production**
+7. **Build for production**
    ```bash
    npm run build
    ```
+
+### Environment Variables
+
+Create a `.env` file in the root directory with your Firebase configuration:
+
+```env
+VITE_FIREBASE_API_KEY=your_api_key_here
+VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+```
+
+**Important**: Never commit your `.env` file to version control. The `.env.example` file shows the required structure.
 
 ## 📖 Usage Guide
 
@@ -263,12 +290,14 @@ Delete    Edit & Resubmit
 - Secure file storage with access controls
 - Input validation and sanitization
 - Audit trail for all actions
+- Environment variables for sensitive configuration
 
 ### Best Practices
 - Principle of least privilege
 - Regular security rule reviews
 - Secure file upload handling
 - XSS and injection prevention
+- API keys secured via environment variables
 
 ## 🚀 Deployment
 
@@ -276,6 +305,20 @@ Delete    Edit & Resubmit
 The application is deployed on Netlify with automatic builds from the main branch.
 
 **Live URL**: https://dulcet-froyo-ec1a95.netlify.app
+
+### Environment Variables for Deployment
+
+For Netlify deployment, set the following environment variables in your Netlify dashboard:
+
+```
+VITE_FIREBASE_API_KEY=your_api_key_here
+VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+```
 
 ### Manual Deployment Steps
 
@@ -288,12 +331,15 @@ The application is deployed on Netlify with automatic builds from the main branc
    - Connect your repository to Netlify
    - Set build command: `npm run build`
    - Set publish directory: `dist`
+   - Configure environment variables in Netlify dashboard
    - Deploy automatically on push to main
 
-### Environment Configuration
-- Firebase configuration is included in the build
-- No additional environment variables required
-- All settings configured in `src/config/firebase.ts`
+### Alternative Deployment Platforms
+
+The application can be deployed to any static hosting service:
+- **Vercel**: Set environment variables in project settings
+- **GitHub Pages**: Use GitHub Secrets for environment variables
+- **AWS S3**: Configure environment variables in build process
 
 ## 🤝 Contributing
 
@@ -304,9 +350,14 @@ The application is deployed on Netlify with automatic builds from the main branc
    ```bash
    git checkout -b feature/your-feature-name
    ```
-3. **Make your changes**
-4. **Test thoroughly**
-5. **Submit a pull request**
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Add your Firebase configuration
+   ```
+4. **Make your changes**
+5. **Test thoroughly**
+6. **Submit a pull request**
 
 ### Code Standards
 - TypeScript for type safety
@@ -314,6 +365,7 @@ The application is deployed on Netlify with automatic builds from the main branc
 - Consistent component structure
 - Comprehensive error handling
 - Responsive design principles
+- Environment variable usage for configuration
 
 ### Testing Guidelines
 - Test all user workflows
@@ -321,6 +373,7 @@ The application is deployed on Netlify with automatic builds from the main branc
 - Check responsive design
 - Validate data integrity
 - Test file upload/download
+- Verify environment variable handling
 
 ## 📞 Support
 
@@ -328,6 +381,7 @@ The application is deployed on Netlify with automatic builds from the main branc
 - **Technical Issues**: Check browser console for errors
 - **Access Problems**: Verify user role assignments in Firebase
 - **Data Issues**: Check Firestore security rules and permissions
+- **Configuration Issues**: Verify environment variables are set correctly
 
 ### Common Issues
 
@@ -345,6 +399,11 @@ The application is deployed on Netlify with automatic builds from the main branc
    - Check file format (Excel for transactions, PDF/images for receipts)
    - Verify Firebase Storage rules
    - Ensure proper file size limits
+
+4. **Configuration Errors**
+   - Verify all environment variables are set
+   - Check Firebase project settings match .env file
+   - Ensure Firebase services are enabled
 
 ### System Requirements
 - **Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
@@ -375,6 +434,7 @@ The application is deployed on Netlify with automatic builds from the main branc
 - Transaction processing
 - Role-based access control
 - Comprehensive reporting
+- Secure environment variable configuration
 
 ---
 
