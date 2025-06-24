@@ -12,6 +12,8 @@ import { AllPOs } from './components/po/AllPOs';
 import { BudgetManagement } from './components/budget/BudgetManagement';
 import { Transactions } from './components/transactions/Transactions';
 import { UserManagement } from './components/admin/UserManagement';
+import { CookieConsent } from './components/ui/CookieConsent';
+import { LocalStorageNotice } from './components/ui/LocalStorageNotice';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isGuest, loading } = useAuth();
@@ -34,12 +36,19 @@ const AppRoutes: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
+        <LocalStorageNotice />
       </div>
     );
   }
 
   if (!currentUser && !isGuest) {
-    return <Login />;
+    return (
+      <>
+        <Login />
+        <CookieConsent />
+        <LocalStorageNotice />
+      </>
+    );
   }
 
   return (
@@ -57,6 +66,8 @@ const AppRoutes: React.FC = () => {
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
+      <CookieConsent />
+      <LocalStorageNotice />
     </Layout>
   );
 };
