@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
 import { Button } from './Button';
 
@@ -26,8 +27,22 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-4xl'
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+  const modalContent = (
+    <div 
+      className="bg-black bg-opacity-75 flex items-center justify-center"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        margin: 0,
+        padding: '16px'
+      }}
+    >
       <div className={`bg-gray-800 rounded-lg shadow-xl ${sizeClasses[size]} w-full border border-gray-700 relative z-[10000]`}>
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
           <h2 className="text-xl font-semibold text-gray-100">{title}</h2>
@@ -44,6 +59,8 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 interface ConfirmModalProps {
@@ -110,8 +127,22 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+  const modalContent = (
+    <div 
+      className="bg-black bg-opacity-75 flex items-center justify-center"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        margin: 0,
+        padding: '16px'
+      }}
+    >
       <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700 relative z-[10000]">
         <div className="p-6">
           <div className="flex items-start space-x-4">
@@ -145,6 +176,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 interface AlertModalProps {
@@ -194,8 +227,22 @@ export const AlertModal: React.FC<AlertModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[9999] p-4">
+  const modalContent = (
+    <div 
+      className="bg-black bg-opacity-75 flex items-center justify-center"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        zIndex: 9999,
+        margin: 0,
+        padding: '16px'
+      }}
+    >
       <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700 relative z-[10000]">
         <div className="p-6">
           <div className="flex items-start space-x-4">
@@ -217,4 +264,6 @@ export const AlertModal: React.FC<AlertModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

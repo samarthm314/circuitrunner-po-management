@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -833,8 +834,22 @@ export const Transactions: React.FC = () => {
       </Card>
 
       {/* PO Selection Modal */}
-      {showPOModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+      {showPOModal && createPortal(
+        <div 
+          className="bg-black bg-opacity-75 flex items-center justify-center"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 50,
+            margin: 0,
+            padding: '16px'
+          }}
+        >
           <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden border border-gray-700">
             <div className="p-6 border-b border-gray-700">
               <div className="flex justify-between items-center mb-4">
@@ -908,7 +923,8 @@ export const Transactions: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* PO Details Modal */}
