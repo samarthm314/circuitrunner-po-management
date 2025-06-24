@@ -595,7 +595,7 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-3">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Item Name</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Item Name<span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       value={item.itemName}
@@ -615,7 +615,7 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Qty</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Qty<span className="text-red-400">*</span></label>
                     <input
                       type="number"
                       min="1"
@@ -625,7 +625,7 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price<span className="text-red-400">*</span></label>
                     <div className="relative">
                       <input
                         ref={(el) => priceInputRefs.current[item.id] = el}
