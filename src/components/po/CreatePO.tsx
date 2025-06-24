@@ -645,7 +645,7 @@ export const CreatePO: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-10">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Notes (Optional)</label>
                     <input
                       type="text"
