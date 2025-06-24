@@ -9,19 +9,19 @@ A comprehensive web application for managing purchase orders, budgets, and trans
 ## 📸 Screenshots
 
 ### Dashboard Overview
-<!-- Add screenshot of the main dashboard here -->
+![Dashboard Overview](images/dashboard.png)
 *The main dashboard provides an overview of budget utilization, pending POs, and recent activity*
 
 ### Purchase Order Creation
-<!-- Add screenshot of the Create PO page here -->
+![Purchase Order Creation](images/create-po.png)
 *Intuitive PO creation with line items, vendor links, and budget tracking*
 
 ### Budget Management
-<!-- Add screenshot of the Budget Management page here -->
+![Budget Management](images/budget-management.png)
 *Real-time budget tracking with visual indicators and alerts*
 
 ### Transaction Management
-<!-- Add screenshot of the Transactions page here -->
+![Transaction Management](images/transactions.png)
 *Excel upload, receipt management, and transaction allocation*
 
 ## 📋 Table of Contents
