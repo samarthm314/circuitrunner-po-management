@@ -22,8 +22,8 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: BarChart3, roles: ['director', 'admin', 'purchaser', 'guest'] },
-  { name: 'Create PO', href: '/create-po', icon: FileText, roles: ['director', 'admin'] },
-  { name: 'My POs', href: '/my-pos', icon: Clock, roles: ['director', 'admin'] },
+  { name: 'Create PO', href: '/create-po', icon: FileText, roles: ['director'] },
+  { name: 'My POs', href: '/my-pos', icon: Clock, roles: ['director'] },
   { name: 'Pending Approval', href: '/pending-approval', icon: CheckCircle, roles: ['admin'] },
   { name: 'Pending Purchase', href: '/pending-purchase', icon: CreditCard, roles: ['purchaser'] },
   { name: 'All POs', href: '/all-pos', icon: Archive, roles: ['admin', 'purchaser', 'guest'] },
