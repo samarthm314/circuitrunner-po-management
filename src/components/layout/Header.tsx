@@ -37,10 +37,12 @@ export const Header: React.FC = () => {
               CircuitRunners PO System
             </h1>
             {isGuest && (
-              <Badge variant="info" size="sm" className="ml-8">
-                <Eye className="h-3 w-3 mr-1" />
-                Guest Mode
-              </Badge>
+              <div className="ml-12">
+                <Badge variant="info" size="sm">
+                  <Eye className="h-3 w-3 mr-1" />
+                  Guest Mode
+                </Badge>
+              </div>
             )}
           </div>
           
