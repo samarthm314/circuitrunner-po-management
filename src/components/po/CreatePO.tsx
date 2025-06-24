@@ -11,6 +11,8 @@ import { getSubOrganizations } from '../../services/subOrgService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useModal } from '../../hooks/useModal';
 
+const PO_NAME_MAX_LENGTH = 30;
+
 export const CreatePO: React.FC = () => {
   const { currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
@@ -205,6 +207,12 @@ export const CreatePO: React.FC = () => {
     }
   };
 
+  const handlePONameChange = (value: string) => {
+    // Limit to maximum length
+    if (value.length <= PO_NAME_MAX_LENGTH) {
+      setPOName(value);
+    }
+  };
 
   const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
   const selectedOrg = subOrganizations.find(org => org.id === selectedSubOrg);
@@ -231,6 +239,15 @@ export const CreatePO: React.FC = () => {
       await showAlert({
         title: 'Validation Error',
         message: 'Please enter a name for this Purchase Order',
+        variant: 'error'
+      });
+      return false;
+    }
+
+    if (poName.trim().length > PO_NAME_MAX_LENGTH) {
+      await showAlert({
+        title: 'Validation Error',
+        message: `PO name must be ${PO_NAME_MAX_LENGTH} characters or less`,
         variant: 'error'
       });
       return false;
@@ -511,17 +528,38 @@ export const CreatePO: React.FC = () => {
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Purchase Order Name <span className="text-red-400">*</span>
               </label>
-              <input
-                type="text"
-                value={poName}
-                onChange={(e) => setPOName(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
-                placeholder="Enter a descriptive name for this PO"
-                required
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Choose a clear, descriptive name that will help identify this PO later
-              </p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={poName}
+                  onChange={(e) => handlePONameChange(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                  placeholder="Enter a descriptive name for this PO"
+                  required
+                  maxLength={PO_NAME_MAX_LENGTH}
+                />
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <span className={`text-xs ${
+                    poName.length > PO_NAME_MAX_LENGTH * 0.8 
+                      ? poName.length >= PO_NAME_MAX_LENGTH 
+                        ? 'text-red-400' 
+                        : 'text-yellow-400'
+                      : 'text-gray-500'
+                  }`}>
+                    {poName.length}/{PO_NAME_MAX_LENGTH}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <p className="text-xs text-gray-400">
+                  Choose a clear, descriptive name that will help identify this PO later
+                </p>
+                {poName.length >= PO_NAME_MAX_LENGTH && (
+                  <p className="text-xs text-red-400 font-medium">
+                    Maximum length reached
+                  </p>
+                )}
+              </div>
             </div>
 
             <div>
