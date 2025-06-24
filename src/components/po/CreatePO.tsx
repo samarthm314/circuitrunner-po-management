@@ -606,7 +606,7 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-2">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">SKU</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">SKU (Optional)</label>
                     <input
                       type="text"
                       value={item.sku || ''}
