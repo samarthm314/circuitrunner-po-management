@@ -5,12 +5,15 @@ import {
   DollarSign, 
   TrendingUp,
   Eye,
-  Info
+  Info,
+  UserX
 } from 'lucide-react';
 import { getSubOrganizations } from '../../services/subOrgService';
 import { SubOrganization } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const GuestDashboard: React.FC = () => {
+  const { currentUser, userProfile } = useAuth();
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +36,10 @@ export const GuestDashboard: React.FC = () => {
   const totalSpent = subOrgs.reduce((sum, org) => sum + org.budgetSpent, 0);
   const budgetRemaining = totalBudget - totalSpent;
 
+  // Determine if this is a signed-in user with no roles or an anonymous guest
+  const isSignedInUser = !!currentUser;
+  const isAnonymousGuest = !currentUser;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -47,20 +54,37 @@ export const GuestDashboard: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
         <Badge variant="info" size="md">
           <Eye className="h-4 w-4 mr-1" />
-          Guest View
+          {isSignedInUser ? 'Limited Access' : 'Guest View'}
         </Badge>
       </div>
 
-      {/* Guest Notice */}
-      <Card className="border-blue-600 bg-blue-900/30">
+      {/* User Status Notice */}
+      <Card className={`border-${isSignedInUser ? 'yellow' : 'blue'}-600 bg-${isSignedInUser ? 'yellow' : 'blue'}-900/30`}>
         <div className="flex items-start space-x-3">
-          <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+          {isSignedInUser ? (
+            <UserX className="h-5 w-5 text-yellow-400 mt-0.5" />
+          ) : (
+            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+          )}
           <div>
-            <h3 className="text-blue-300 font-medium mb-1">Welcome, Guest!</h3>
-            <p className="text-blue-200 text-sm">
-              You're viewing the CircuitRunners PO System in read-only mode. You can explore budget information 
-              and view purchase orders, but cannot make any changes. Contact an administrator for full access.
-            </p>
+            {isSignedInUser ? (
+              <>
+                <h3 className="text-yellow-300 font-medium mb-1">No Roles Assigned</h3>
+                <p className="text-yellow-200 text-sm">
+                  Welcome, {userProfile?.displayName}! Your account has been created but no roles have been assigned yet. 
+                  You currently have read-only access to budget information and purchase orders. 
+                  Please contact an administrator to have appropriate roles assigned to your account.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-blue-300 font-medium mb-1">Welcome, Guest!</h3>
+                <p className="text-blue-200 text-sm">
+                  You're viewing the CircuitRunners PO System in read-only mode. You can explore budget information 
+                  and view purchase orders, but cannot make any changes. Contact an administrator for full access.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </Card>
@@ -193,37 +217,56 @@ export const GuestDashboard: React.FC = () => {
           </div>
           
           <div>
-            <h4 className="text-sm font-medium text-gray-200 mb-3">Budget Utilization</h4>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-400">Overall Utilization</span>
-                  <span className="text-gray-300">
-                    {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
-                  </span>
+            <h4 className="text-sm font-medium text-gray-200 mb-3">
+              {isSignedInUser ? 'Getting Started' : 'Budget Utilization'}
+            </h4>
+            {isSignedInUser ? (
+              <div className="space-y-3 text-sm">
+                <div className="flex items-start space-x-2">
+                  <span className="bg-yellow-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">1</span>
+                  <p className="text-gray-300">Contact your administrator to request role assignment</p>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      totalSpent > totalBudget 
-                        ? 'bg-red-500' 
-                        : (totalSpent / totalBudget) > 0.8 
-                          ? 'bg-yellow-500' 
-                          : 'bg-green-500'
-                    }`}
-                    style={{ 
-                      width: `${totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0}%` 
-                    }}
-                  />
+                <div className="flex items-start space-x-2">
+                  <span className="bg-yellow-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">2</span>
+                  <p className="text-gray-300">Once roles are assigned, you'll have access to create POs, manage budgets, or handle purchases</p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <span className="bg-yellow-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">3</span>
+                  <p className="text-gray-300">Available roles: Director (create POs), Admin (approve POs), Purchaser (buy items)</p>
                 </div>
               </div>
-              
-              <div className="text-xs text-gray-400">
-                <p>• Green: Under 80% utilization</p>
-                <p>• Yellow: 80-100% utilization</p>
-                <p>• Red: Over budget</p>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-400">Overall Utilization</span>
+                    <span className="text-gray-300">
+                      {totalBudget > 0 ? ((totalSpent / totalBudget) * 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        totalSpent > totalBudget 
+                          ? 'bg-red-500' 
+                          : (totalSpent / totalBudget) > 0.8 
+                            ? 'bg-yellow-500' 
+                            : 'bg-green-500'
+                      }`}
+                      style={{ 
+                        width: `${totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0}%` 
+                      }}
+                    />
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-400">
+                  <p>• Green: Under 80% utilization</p>
+                  <p>• Yellow: 80-100% utilization</p>
+                  <p>• Red: Over budget</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </Card>

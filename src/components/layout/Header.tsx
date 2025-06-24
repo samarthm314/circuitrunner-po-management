@@ -78,6 +78,9 @@ export const Header: React.FC = () => {
   const hasGoogleLinked = currentUser?.providerData.some(provider => provider.providerId === 'google.com');
   const hasPasswordProvider = currentUser?.providerData.some(provider => provider.providerId === 'password');
 
+  // Determine if this is a signed-in user with guest-level access
+  const isSignedInGuest = currentUser && isGuest;
+
   return (
     <header className="bg-gray-800 shadow-sm border-b border-gray-700 relative z-40">
       <div className="w-full px-3 sm:px-4 lg:px-6">
@@ -97,8 +100,12 @@ export const Header: React.FC = () => {
               <div className="ml-2 sm:ml-6">
                 <Badge variant="info" size="sm">
                   <Eye className="h-3 w-3 mr-1" />
-                  <span className="hidden sm:inline">Guest Mode</span>
-                  <span className="sm:hidden">Guest</span>
+                  <span className="hidden sm:inline">
+                    {isSignedInGuest ? 'Limited Access' : 'Guest Mode'}
+                  </span>
+                  <span className="sm:hidden">
+                    {isSignedInGuest ? 'Limited' : 'Guest'}
+                  </span>
                 </Badge>
               </div>
             )}
@@ -106,6 +113,7 @@ export const Header: React.FC = () => {
           
           {/* Right side - User controls */}
           <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+            {/* Only show notifications for users with actual roles */}
             {!isGuest && <NotificationDropdown />}
             
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -117,7 +125,7 @@ export const Header: React.FC = () => {
                   </p>
                   <div className="flex items-center space-x-1 sm:space-x-2">
                     <p className="text-gray-400 capitalize text-xs sm:text-sm truncate">
-                      {isGuest ? 'Guest' : displayRoles}
+                      {isSignedInGuest ? 'No Roles Assigned' : displayRoles}
                     </p>
                     {userRoles.length > 1 && !isGuest && (
                       <div className="hidden sm:flex space-x-1">
@@ -132,7 +140,16 @@ export const Header: React.FC = () => {
                 </div>
               </div>
 
-              {/* Google Account Linking Button */}
+              {/* Show role assignment notice for signed-in guests */}
+              {isSignedInGuest && (
+                <div className="hidden sm:block">
+                  <Badge variant="warning" size="sm">
+                    Contact Admin for Roles
+                  </Badge>
+                </div>
+              )}
+
+              {/* Google Account Linking Button - only for users with password auth and no Google link */}
               {!isGuest && hasPasswordProvider && !hasGoogleLinked && (
                 <Button
                   variant="outline"

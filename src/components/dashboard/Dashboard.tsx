@@ -8,7 +8,8 @@ import {
   Clock, 
   CheckCircle, 
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDashboardStats, getRecentActivity } from '../../services/dashboardService';
@@ -31,7 +32,7 @@ interface ActivityItem {
 }
 
 export const Dashboard: React.FC = () => {
-  const { userProfile, isGuest } = useAuth();
+  const { userProfile, isGuest, currentUser } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalPOs: 0,
@@ -43,7 +44,7 @@ export const Dashboard: React.FC = () => {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // If user is a guest, show the guest dashboard
+  // If user is a guest (including signed-in users with no roles), show the guest dashboard
   if (isGuest) {
     return <GuestDashboard />;
   }

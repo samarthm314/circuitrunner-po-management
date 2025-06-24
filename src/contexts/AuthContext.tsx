@@ -43,23 +43,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            setUserProfile({ 
+            const profile = { 
               id: user.uid, 
               ...userData,
               createdAt: userData.createdAt?.toDate() || new Date()
-            } as User);
+            } as User;
+            
+            setUserProfile(profile);
+            
+            // Check if user has no role or guest role - treat as guest
+            if (!profile.role || profile.role === 'guest') {
+              setIsGuest(true);
+            } else {
+              setIsGuest(false);
+            }
           } else {
             // User exists in Firebase Auth but not in Firestore
             // This shouldn't happen with proper setup, but handle gracefully
             console.warn('User authenticated but no profile found in Firestore');
             setUserProfile(null);
+            setIsGuest(true); // Treat as guest if no profile
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
           setUserProfile(null);
+          setIsGuest(true); // Treat as guest on error
         }
       } else if (!user && !isGuest) {
         setUserProfile(null);
+        setIsGuest(false);
       }
       
       setLoading(false);
@@ -70,6 +82,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasRole = (role: string): boolean => {
     if (!userProfile) return false;
+    
+    // Guest role check
+    if (role === 'guest') {
+      return isGuest || !userProfile.role || userProfile.role === 'guest';
+    }
+    
+    // If user is treated as guest, they only have guest role
+    if (isGuest) {
+      return role === 'guest';
+    }
     
     // Check primary role
     if (userProfile.role === role) return true;
@@ -82,6 +104,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const getAllRoles = (): string[] => {
     if (!userProfile) return [];
+    
+    // If user is treated as guest, return only guest role
+    if (isGuest || !userProfile.role || userProfile.role === 'guest') {
+      return ['guest'];
+    }
     
     const roles = [userProfile.role];
     if (userProfile.roles) {
