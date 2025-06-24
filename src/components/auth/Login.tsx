@@ -50,8 +50,8 @@ export const Login: React.FC = () => {
               />
             </div>
           </div>
-          <CardTitle className="text-2xl text-gray-100">CircuitRunners PO System</CardTitle>
-          <p className="text-gray-400 mt-2">Sign in to manage purchase orders</p>
+          <CardTitle className="text-2xl text-gray-100">CircuitRunners Finances System</CardTitle>
+          <p className="text-gray-400 mt-2">Sign in to manage finances</p>
         </CardHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
