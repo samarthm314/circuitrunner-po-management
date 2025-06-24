@@ -95,7 +95,16 @@ export const UserManagement: React.FC = () => {
         }
 
         if (user.roles) {
+          if (!Array.isArray(user.roles)) {
+            throw new Error(`${userIndex}: roles field must be an array`);
+          }
+          
           for (const role of user.roles) {
+            // Handle case where role might be a comma-separated string
+            if (typeof role === 'string' && role.includes(',')) {
+              throw new Error(`${userIndex}: Each role must be a separate array element. Found comma-separated string "${role}". Use separate array elements like ["director", "admin"] instead of ["director, admin"]`);
+            }
+            
             if (!validRoles.includes(role)) {
               throw new Error(`${userIndex}: Additional role "${role}" is invalid. Roles must be one of: ${validRoles.join(', ')}`);
             }
@@ -110,32 +119,32 @@ export const UserManagement: React.FC = () => {
       let created = 0;
       let errors: string[] = [];
 
-      for (const userData of userData) {
+      for (const userImportData of userData) {
         try {
           // Create user in Firebase Auth
           const userCredential = await createUserWithEmailAndPassword(
             auth, 
-            userData.email, 
-            userData.password
+            userImportData.email, 
+            userImportData.password
           );
 
           // Create user profile in Firestore
           const userDoc: any = {
-            email: userData.email,
-            displayName: userData.displayName,
-            role: userData.role,
+            email: userImportData.email,
+            displayName: userImportData.displayName,
+            role: userImportData.role,
             createdAt: new Date()
           };
 
-          if (userData.roles && userData.roles.length > 0) {
-            userDoc.roles = userData.roles;
+          if (userImportData.roles && userImportData.roles.length > 0) {
+            userDoc.roles = userImportData.roles;
           }
 
           await setDoc(doc(db, 'users', userCredential.user.uid), userDoc);
 
           created++;
         } catch (error: any) {
-          errors.push(`${userData.email}: ${error.message}`);
+          errors.push(`${userImportData.email}: ${error.message}`);
         }
       }
 
@@ -401,6 +410,9 @@ export const UserManagement: React.FC = () => {
           </p>
           <p className="text-red-300">
             <strong>Important:</strong> Only "director", "admin", and "purchaser" roles are supported. Guest users cannot be imported through this system.
+          </p>
+          <p className="text-blue-300">
+            <strong>Roles Format:</strong> Each role must be a separate string in the array. Use ["director", "admin"] not ["director, admin"].
           </p>
         </div>
       </Card>
