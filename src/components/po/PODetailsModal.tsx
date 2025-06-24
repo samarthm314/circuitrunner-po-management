@@ -157,6 +157,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         'Unit Price': `$${item.unitPrice.toFixed(2)}`,
         'Total Price': `$${item.totalPrice.toFixed(2)}`,
         'Product Link': item.link || 'N/A',
+        'Notes': item.notes || 'N/A',
         'Purchased': userProfile?.role === 'purchaser' && checkedItems[index] ? 'Yes' : 'No'
       }));
 
@@ -190,6 +191,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         { wch: 12 }, // Unit Price
         { wch: 12 }, // Total Price
         { wch: 40 }, // Product Link
+        { wch: 30 }, // Notes
         { wch: 10 }  // Purchased
       ];
       lineItemsWs['!cols'] = lineItemsColWidths;
@@ -423,6 +425,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
                     <th className="text-right py-3 px-4 font-medium text-gray-200">Unit Price</th>
                     <th className="text-right py-3 px-4 font-medium text-gray-200">Total</th>
                     <th className="text-center py-3 px-4 font-medium text-gray-200">Link</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -477,19 +480,22 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
                             <span className="text-gray-500">-</span>
                           )}
                         </td>
+                        <td className={`py-3 px-4 text-gray-300 text-sm ${textStyle}`}>
+                          {item.notes || '-'}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot className="bg-gray-700">
                   <tr>
-                    <td colSpan={showCheckboxes ? 6 : 5} className="py-3 px-4 text-right font-medium text-gray-200">
+                    <td colSpan={showCheckboxes ? 7 : 6} className="py-3 px-4 text-right font-medium text-gray-200">
                       Total Amount:
                     </td>
                     <td className="py-3 px-4 text-right font-bold text-lg text-green-400">
                       ${po.totalAmount.toFixed(2)}
                     </td>
-                    <td></td>
+                    <td colSpan={2}></td>
                   </tr>
                 </tfoot>
               </table>

@@ -29,7 +29,7 @@ export const CreatePO: React.FC = () => {
   const [editingPOId, setEditingPOId] = useState<string | null>(null);
   const [originalPOStatus, setOriginalPOStatus] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', totalPrice: 0 }
+    { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', notes: '', totalPrice: 0 }
   ]);
   
   // Track the raw input values for price fields
@@ -111,6 +111,7 @@ export const CreatePO: React.FC = () => {
       quantity: 1,
       unitPrice: 0,
       link: '',
+      notes: '',
       totalPrice: 0
     };
     setLineItems([...lineItems, newItem]);
@@ -557,7 +558,7 @@ export const CreatePO: React.FC = () => {
 
                 {/* Grid layout for form fields - responsive */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 pb-8">
-                  <div className="lg:col-span-3">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label>
                     <input
                       type="text"
@@ -567,7 +568,7 @@ export const CreatePO: React.FC = () => {
                       placeholder="Vendor name"
                     />
                   </div>
-                  <div className="lg:col-span-3">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Item Name</label>
                     <input
                       type="text"
@@ -577,7 +578,7 @@ export const CreatePO: React.FC = () => {
                       placeholder="Item description"
                     />
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">SKU</label>
                     <input
                       type="text"
@@ -597,7 +598,7 @@ export const CreatePO: React.FC = () => {
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                     />
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
                     <div className="relative">
                       <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -612,7 +613,7 @@ export const CreatePO: React.FC = () => {
                       />
                     </div>
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="sm:col-span-2 lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
                     <div className="flex">
                       <input
@@ -634,6 +635,16 @@ export const CreatePO: React.FC = () => {
                         </a>
                       )}
                     </div>
+                  </div>
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Notes (Optional)</label>
+                    <input
+                      type="text"
+                      value={item.notes || ''}
+                      onChange={(e) => updateLineItem(item.id, 'notes', e.target.value)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      placeholder="Additional notes or specifications..."
+                    />
                   </div>
                 </div>
 

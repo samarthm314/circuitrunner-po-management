@@ -22,6 +22,7 @@ export interface LineItem {
   quantity: number;
   unitPrice: number;
   link?: string;
+  notes?: string; // Added optional notes field
   totalPrice: number;
 }
 
