@@ -519,6 +519,59 @@ export const UserManagement: React.FC = () => {
         </div>
       </div>
 
+      {/* Instructions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Import Instructions & Google Sign-In</CardTitle>
+        </CardHeader>
+        <div className="space-y-4 text-sm text-gray-300">
+          <div>
+            <p><strong className="text-gray-200">Authentication Methods:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
+              <li><strong>Email/Password:</strong> Traditional sign-in method for bulk user creation</li>
+              <li><strong>Google Sign-In:</strong> Users can sign in with their @circuitrunners.com Google account</li>
+              <li><strong>Account Linking:</strong> Existing email/password users can link their Google account for convenience</li>
+            </ul>
+          </div>
+          
+          <div>
+            <p><strong className="text-gray-200">New Google Users:</strong></p>
+            <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
+              <li>Users signing up with Google for the first time will have <strong>guest role</strong> by default</li>
+              <li>Administrators must manually assign proper roles to new Google users</li>
+              <li>Only @circuitrunners.com Google accounts are allowed</li>
+            </ul>
+          </div>
+
+          <div>
+            <p><strong className="text-gray-200">JSON Import Format:</strong></p>
+            <div className="bg-gray-700 p-4 rounded-lg mt-2">
+              <pre className="text-xs text-gray-300 overflow-x-auto">
+{`[
+  {
+    "email": "user@circuitrunners.com",
+    "password": "SecurePassword123!",
+    "displayName": "User Name",
+    "role": "director",
+    "roles": ["director", "admin"]
+  }
+]`}
+              </pre>
+            </div>
+          </div>
+
+          <div>
+            <ul className="list-disc list-inside space-y-1 ml-4">
+              <li><strong>email:</strong> Must end with @circuitrunners.com</li>
+              <li><strong>password:</strong> Strong password (Firebase requirements apply)</li>
+              <li><strong>displayName:</strong> Full name for display</li>
+              <li><strong>role:</strong> Primary role - "director", "admin", or "purchaser"</li>
+              <li><strong>roles:</strong> (Optional) Array of additional roles for multi-role users</li>
+            </ul>
+          </div>
+        </div>
+      </Card>
+
       {/* Search and Filter Section */}
       <Card>
         <div className="space-y-4">
@@ -626,59 +679,6 @@ export const UserManagement: React.FC = () => {
               <span>Multi-role users: {multiRoleUsers.length}</span>
               <span>Total users: {users.length}</span>
             </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Import Instructions & Google Sign-In</CardTitle>
-        </CardHeader>
-        <div className="space-y-4 text-sm text-gray-300">
-          <div>
-            <p><strong className="text-gray-200">Authentication Methods:</strong></p>
-            <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
-              <li><strong>Email/Password:</strong> Traditional sign-in method for bulk user creation</li>
-              <li><strong>Google Sign-In:</strong> Users can sign in with their @circuitrunners.com Google account</li>
-              <li><strong>Account Linking:</strong> Existing email/password users can link their Google account for convenience</li>
-            </ul>
-          </div>
-          
-          <div>
-            <p><strong className="text-gray-200">New Google Users:</strong></p>
-            <ul className="list-disc list-inside space-y-1 ml-4 mt-2">
-              <li>Users signing up with Google for the first time will have <strong>guest role</strong> by default</li>
-              <li>Administrators must manually assign proper roles to new Google users</li>
-              <li>Only @circuitrunners.com Google accounts are allowed</li>
-            </ul>
-          </div>
-
-          <div>
-            <p><strong className="text-gray-200">JSON Import Format:</strong></p>
-            <div className="bg-gray-700 p-4 rounded-lg mt-2">
-              <pre className="text-xs text-gray-300 overflow-x-auto">
-{`[
-  {
-    "email": "user@circuitrunners.com",
-    "password": "SecurePassword123!",
-    "displayName": "User Name",
-    "role": "director",
-    "roles": ["director", "admin"]
-  }
-]`}
-              </pre>
-            </div>
-          </div>
-
-          <div>
-            <ul className="list-disc list-inside space-y-1 ml-4">
-              <li><strong>email:</strong> Must end with @circuitrunners.com</li>
-              <li><strong>password:</strong> Strong password (Firebase requirements apply)</li>
-              <li><strong>displayName:</strong> Full name for display</li>
-              <li><strong>role:</strong> Primary role - "director", "admin", or "purchaser"</li>
-              <li><strong>roles:</strong> (Optional) Array of additional roles for multi-role users</li>
-            </ul>
           </div>
         </div>
       </Card>
