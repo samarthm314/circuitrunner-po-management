@@ -231,65 +231,67 @@ export const Dashboard: React.FC = () => {
 
       {/* Filter Controls */}
       <Card>
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              <Building className="h-4 w-4 inline mr-1" />
-              Budget View
-            </label>
-            <select
-              value={selectedSubOrg}
-              onChange={(e) => handleSubOrgChange(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-            >
-              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
-              {subOrgs.map(org => (
-                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                  {org.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              {selectedSubOrg === 'all' 
-                ? 'Showing budget data for all sub-organizations' 
-                : `Showing budget data for ${subOrgs.find(org => org.id === selectedSubOrg)?.name || 'selected organization'}`
-              }
-            </p>
-          </div>
-          
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              <User className="h-4 w-4 inline mr-1" />
-              PO Scope
-            </label>
-            <select
-              value={poScope}
-              onChange={(e) => handlePOScopeChange(e.target.value as 'organization' | 'authored')}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-            >
-              <option value="organization" className="text-gray-100 bg-gray-700">Organization-wide</option>
-              <option value="authored" className="text-gray-100 bg-gray-700">My POs Only</option>
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              {poScope === 'organization' 
-                ? 'Showing PO statistics for the entire organization' 
-                : 'Showing statistics for POs you have created'
-              }
-            </p>
+        <div className="space-y-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                <Building className="h-4 w-4 inline mr-1" />
+                Budget View
+              </label>
+              <select
+                value={selectedSubOrg}
+                onChange={(e) => handleSubOrgChange(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+              >
+                <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+                {subOrgs.map(org => (
+                  <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedSubOrg === 'all' 
+                  ? 'Showing budget data for all sub-organizations' 
+                  : `Showing budget data for ${subOrgs.find(org => org.id === selectedSubOrg)?.name || 'selected organization'}`
+                }
+              </p>
+            </div>
+            
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                <User className="h-4 w-4 inline mr-1" />
+                PO Scope
+              </label>
+              <select
+                value={poScope}
+                onChange={(e) => handlePOScopeChange(e.target.value as 'organization' | 'authored')}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+              >
+                <option value="organization" className="text-gray-100 bg-gray-700">Organization-wide</option>
+                <option value="authored" className="text-gray-100 bg-gray-700">My POs Only</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {poScope === 'organization' 
+                  ? 'Showing PO statistics for the entire organization' 
+                  : 'Showing statistics for POs you have created'
+                }
+              </p>
+            </div>
           </div>
 
-          {/* Clear Filters Button - Centered */}
-          <div className="flex items-end justify-center lg:justify-start">
-            {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
+          {/* Clear Filters Button - Now properly positioned with filter controls */}
+          {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
+            <div className="flex justify-center">
               <button
                 onClick={clearFilters}
-                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors border border-gray-600 hover:border-gray-500"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-4 w-4 mr-2" />
                 Clear Filters
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </Card>
 

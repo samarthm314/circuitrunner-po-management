@@ -149,44 +149,46 @@ export const GuestDashboard: React.FC = () => {
 
       {/* Filter Controls */}
       <Card>
-        <div className="flex flex-col lg:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              <Building className="h-4 w-4 inline mr-1" />
-              View by Organization
-            </label>
-            <select
-              value={selectedSubOrg}
-              onChange={(e) => handleSubOrgChange(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-            >
-              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
-              {subOrgs.map(org => (
-                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                  {org.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              {selectedSubOrg === 'all' 
-                ? 'Showing data for all sub-organizations' 
-                : `Showing data for ${subOrgs.find(org => org.id === selectedSubOrg)?.name || 'selected organization'}`
-              }
-            </p>
+        <div className="space-y-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                <Building className="h-4 w-4 inline mr-1" />
+                View by Organization
+              </label>
+              <select
+                value={selectedSubOrg}
+                onChange={(e) => handleSubOrgChange(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+              >
+                <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+                {subOrgs.map(org => (
+                  <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                {selectedSubOrg === 'all' 
+                  ? 'Showing data for all sub-organizations' 
+                  : `Showing data for ${subOrgs.find(org => org.id === selectedSubOrg)?.name || 'selected organization'}`
+                }
+              </p>
+            </div>
           </div>
           
-          {/* Clear Filter Button - Centered */}
-          <div className="flex items-end justify-center lg:justify-start">
-            {selectedSubOrg !== 'all' && (
+          {/* Clear Filter Button - Now properly positioned with filter controls */}
+          {selectedSubOrg !== 'all' && (
+            <div className="flex justify-center">
               <button
                 onClick={clearFilters}
-                className="flex items-center px-3 py-2 text-sm text-gray-300 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors"
+                className="flex items-center px-4 py-2 text-sm text-gray-300 hover:text-gray-100 hover:bg-gray-700 rounded-lg transition-colors border border-gray-600 hover:border-gray-500"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-4 w-4 mr-2" />
                 Clear Filter
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </Card>
 
