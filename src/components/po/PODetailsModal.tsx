@@ -109,8 +109,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
     try {
       console.log('Starting download summary...');
       
-      // Prepare PO summary data
-      const summaryData = {
+      // Prepare PO summary data - conditionally include fields based on guest status
+      const summaryData: any = {
         'PO Name': po.name || `PO #${po.id.slice(-6).toUpperCase()}`,
         'PO Number': `#${po.id.slice(-6).toUpperCase()}`,
         'Status': po.status.charAt(0).toUpperCase() + po.status.slice(1).replace('_', ' '),
@@ -120,14 +120,15 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         'Created Date': po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Approved Date': po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Purchased Date': po.purchasedAt ? format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
-        'Special Request': po.specialRequest || 'None',
-        'Over Budget Justification': po.overBudgetJustification || 'N/A',
-        // Only include comments if not hiding them
-        ...(shouldHideComments ? {} : {
-          'Admin Comments': po.adminComments || 'None',
-          'Purchaser Comments': po.purchaserComments || 'None'
-        })
       };
+
+      // Only include special request and comments if not in guest mode
+      if (!shouldHideComments) {
+        summaryData['Special Request'] = po.specialRequest || 'None';
+        summaryData['Over Budget Justification'] = po.overBudgetJustification || 'N/A';
+        summaryData['Admin Comments'] = po.adminComments || 'None';
+        summaryData['Purchaser Comments'] = po.purchaserComments || 'None';
+      }
 
       // Prepare line items data
       const lineItemsData = po.lineItems.map((item, index) => ({
@@ -184,7 +185,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       const poName = po.name || `PO_${po.id.slice(-6).toUpperCase()}`;
       const safeName = poName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const date = new Date().toISOString().split('T')[0];
-      const filename = `${safeName}_Summary_${date}.xlsx`;
+      const guestSuffix = shouldHideComments ? '_guest' : '';
+      const filename = `${safeName}_Summary${guestSuffix}_${date}.xlsx`;
 
       console.log('Writing file:', filename);
       
@@ -282,16 +284,16 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Special Request */}
-          {po.specialRequest && (
+          {/* Special Request - Hidden for guests */}
+          {!shouldHideComments && po.specialRequest && (
             <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
               <h3 className="font-medium text-blue-300 mb-2">Special Request</h3>
               <p className="text-blue-200">{po.specialRequest}</p>
             </div>
           )}
 
-          {/* Over Budget Justification */}
-          {po.overBudgetJustification && (
+          {/* Over Budget Justification - Hidden for guests */}
+          {!shouldHideComments && po.overBudgetJustification && (
             <div className="bg-yellow-900/30 border border-yellow-700 p-4 rounded-lg">
               <h3 className="font-medium text-yellow-300 mb-2">Over Budget Justification</h3>
               <p className="text-yellow-200">{po.overBudgetJustification}</p>
