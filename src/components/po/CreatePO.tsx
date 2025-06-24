@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, ExternalLink, Save, RefreshCw } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -36,6 +36,9 @@ export const CreatePO: React.FC = () => {
   const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({
     '1': ''
   });
+
+  // Refs for price inputs to control cursor position
+  const priceInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   useEffect(() => {
     const fetchSubOrganizations = async () => {
@@ -132,6 +135,8 @@ export const CreatePO: React.FC = () => {
         delete newInputs[id];
         return newInputs;
       });
+      // Clean up refs
+      delete priceInputRefs.current[id];
     }
   };
 
@@ -184,6 +189,17 @@ export const CreatePO: React.FC = () => {
       const newValue = currentValue.slice(0, -1);
       handlePriceChange(id, newValue);
       event.preventDefault();
+    }
+  };
+
+  const handlePriceFocus = (id: string) => {
+    // Set cursor to the beginning of the input
+    const input = priceInputRefs.current[id];
+    if (input) {
+      // Use setTimeout to ensure the focus event completes first
+      setTimeout(() => {
+        input.setSelectionRange(0, 0);
+      }, 0);
     }
   };
 
@@ -612,10 +628,12 @@ export const CreatePO: React.FC = () => {
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
                     <div className="relative">
                       <input
+                        ref={(el) => priceInputRefs.current[item.id] = el}
                         type="text"
                         value={formatCentsAsCurrency(priceInputs[item.id] || '')}
                         onChange={(e) => handlePriceChange(item.id, e.target.value)}
                         onKeyDown={(e) => handlePriceKeyDown(item.id, e)}
+                        onFocus={() => handlePriceFocus(item.id)}
                         className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                         placeholder="$0.00"
                       />
