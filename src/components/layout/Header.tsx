@@ -62,12 +62,13 @@ export const Header: React.FC = () => {
               </div>
               
               <Button
-                variant="ghost"
+                variant="danger"
                 size="sm"
                 onClick={handleSignOut}
-                className="text-gray-400 hover:text-gray-200"
+                className="flex items-center"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4 mr-2" />
+                Log Out
               </Button>
             </div>
           </div>
