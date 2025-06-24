@@ -32,7 +32,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-green-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-green-900 flex flex-col items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
@@ -107,6 +107,13 @@ export const Login: React.FC = () => {
           </p>
         </div>
       </Card>
+
+      {/* Made by footer */}
+      <div className="mt-8 text-center">
+        <p className="text-sm text-gray-500">
+          Made with ❤️ by Samarth Mahapatra
+        </p>
+      </div>
     </div>
   );
 };
