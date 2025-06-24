@@ -31,6 +31,7 @@ import * as XLSX from 'xlsx';
 export const Transactions: React.FC = () => {
   const { userProfile } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -38,10 +39,26 @@ export const Transactions: React.FC = () => {
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [processingExcel, setProcessingExcel] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [subOrgFilter, setSubOrgFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    // Apply sub-organization filter
+    let filtered = transactions;
+
+    if (subOrgFilter !== 'all') {
+      if (subOrgFilter === 'unallocated') {
+        filtered = filtered.filter(t => !t.subOrgId);
+      } else {
+        filtered = filtered.filter(t => t.subOrgId === subOrgFilter);
+      }
+    }
+
+    setFilteredTransactions(filtered);
+  }, [transactions, subOrgFilter]);
 
   const fetchData = async () => {
     try {
@@ -50,6 +67,7 @@ export const Transactions: React.FC = () => {
         getSubOrganizations()
       ]);
       setTransactions(transactionsData);
+      setFilteredTransactions(transactionsData);
       setSubOrgs(subOrgsData);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -120,8 +138,8 @@ export const Transactions: React.FC = () => {
 
   const handleExport = () => {
     try {
-      // Prepare data for export
-      const exportData = transactions.map(transaction => ({
+      // Use filtered transactions for export
+      const exportData = filteredTransactions.map(transaction => ({
         'Post Date': transaction.postDate.toLocaleDateString(),
         'Description': transaction.description,
         'Amount': transaction.debitAmount,
@@ -139,9 +157,10 @@ export const Transactions: React.FC = () => {
       // Add worksheet to workbook
       XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
 
-      // Generate filename with current date
+      // Generate filename with current date and filter info
       const date = new Date().toISOString().split('T')[0];
-      const filename = `transactions_export_${date}.xlsx`;
+      const filterSuffix = subOrgFilter !== 'all' ? `_${subOrgFilter === 'unallocated' ? 'unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name?.replace(/\s+/g, '_') || 'filtered'}` : '';
+      const filename = `transactions_export${filterSuffix}_${date}.xlsx`;
 
       // Save file
       XLSX.writeFile(wb, filename);
@@ -279,9 +298,9 @@ export const Transactions: React.FC = () => {
     }
   };
 
-  const totalSpent = transactions.reduce((sum, t) => sum + t.debitAmount, 0);
-  const allocatedTransactions = transactions.filter(t => t.subOrgId).length;
-  const unallocatedAmount = transactions
+  const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
+  const allocatedTransactions = filteredTransactions.filter(t => t.subOrgId).length;
+  const unallocatedAmount = filteredTransactions
     .filter(t => !t.subOrgId)
     .reduce((sum, t) => sum + t.debitAmount, 0);
 
@@ -330,6 +349,40 @@ export const Transactions: React.FC = () => {
         </div>
       </div>
 
+      {/* Filter Section */}
+      <Card>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="sm:w-64">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Filter by Organization
+            </label>
+            <select
+              value={subOrgFilter}
+              onChange={(e) => setSubOrgFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+              <option value="unallocated" className="text-gray-100 bg-gray-700">Unallocated</option>
+              {subOrgs.map(org => (
+                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 flex items-end">
+            <div className="text-sm text-gray-400">
+              Showing {filteredTransactions.length} of {transactions.length} transactions
+              {subOrgFilter !== 'all' && (
+                <span className="ml-2">
+                  (filtered by: {subOrgFilter === 'unallocated' ? 'Unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name})
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -338,7 +391,9 @@ export const Transactions: React.FC = () => {
               <DollarSign className="h-6 w-6 text-red-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total Spent</p>
+              <p className="text-sm font-medium text-gray-400">
+                {subOrgFilter !== 'all' ? 'Filtered' : 'Total'} Spent
+              </p>
               <p className="text-2xl font-bold text-gray-100">
                 ${totalSpent.toLocaleString()}
               </p>
@@ -352,8 +407,10 @@ export const Transactions: React.FC = () => {
               <FileText className="h-6 w-6 text-blue-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">Total Transactions</p>
-              <p className="text-2xl font-bold text-gray-100">{transactions.length}</p>
+              <p className="text-sm font-medium text-gray-400">
+                {subOrgFilter !== 'all' ? 'Filtered' : 'Total'} Transactions
+              </p>
+              <p className="text-2xl font-bold text-gray-100">{filteredTransactions.length}</p>
             </div>
           </div>
         </Card>
@@ -405,7 +462,7 @@ export const Transactions: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {transactions.map((transaction) => {
+              {filteredTransactions.map((transaction) => {
                 const isEditing = editingId === transaction.id;
 
                 return (
@@ -548,10 +605,14 @@ export const Transactions: React.FC = () => {
           </table>
         </div>
 
-        {transactions.length === 0 && (
+        {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">No transactions found</p>
-            <p className="text-gray-500 mt-2">Upload an Excel file to get started</p>
+            <p className="text-gray-400 text-lg">
+              {subOrgFilter !== 'all' ? 'No transactions found for the selected organization' : 'No transactions found'}
+            </p>
+            <p className="text-gray-500 mt-2">
+              {subOrgFilter !== 'all' ? 'Try selecting a different organization or clear the filter' : 'Upload an Excel file to get started'}
+            </p>
           </div>
         )}
       </Card>
