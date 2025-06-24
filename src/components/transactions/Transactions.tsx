@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { 
   Upload, 
   Download, 
@@ -32,10 +33,12 @@ import { getPOsByStatus, getPOById } from '../../services/poService';
 import { useAuth } from '../../contexts/AuthContext';
 import { PODetailsModal } from '../po/PODetailsModal';
 import { GuestTransactions } from './GuestTransactions';
+import { useModal } from '../../hooks/useModal';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
   const { userProfile, isGuest } = useAuth();
+  const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
@@ -108,11 +111,19 @@ export const Transactions: React.FC = () => {
         setSelectedPO(po);
         setIsPODetailsModalOpen(true);
       } else {
-        alert('PO not found');
+        await showAlert({
+          title: 'Error',
+          message: 'PO not found',
+          variant: 'error'
+        });
       }
     } catch (error) {
       console.error('Error fetching PO details:', error);
-      alert('Error loading PO details');
+      await showAlert({
+        title: 'Error',
+        message: 'Error loading PO details',
+        variant: 'error'
+      });
     } finally {
       setLoadingPODetails(false);
     }
@@ -167,7 +178,11 @@ export const Transactions: React.FC = () => {
 
       const result = await processExcelData(rows);
       
-      alert(`Excel processed successfully!\nProcessed: ${result.processed}\nSkipped: ${result.skipped}\nErrors: ${result.errors.length}`);
+      await showAlert({
+        title: 'Excel Processing Complete',
+        message: `Excel processed successfully!\nProcessed: ${result.processed}\nSkipped: ${result.skipped}\nErrors: ${result.errors.length}`,
+        variant: 'success'
+      });
       
       if (result.errors.length > 0) {
         console.error('Processing errors:', result.errors);
@@ -176,7 +191,11 @@ export const Transactions: React.FC = () => {
       await fetchData(); // Refresh data
     } catch (error) {
       console.error('Error processing Excel:', error);
-      alert('Error processing Excel file. Please check the format.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error processing Excel file. Please check the format.',
+        variant: 'error'
+      });
     } finally {
       setProcessingExcel(false);
       event.target.value = ''; // Reset file input
@@ -214,7 +233,11 @@ export const Transactions: React.FC = () => {
       XLSX.writeFile(wb, filename);
     } catch (error) {
       console.error('Error exporting transactions:', error);
-      alert('Error exporting transactions. Please try again.');
+      showAlert({
+        title: 'Error',
+        message: 'Error exporting transactions. Please try again.',
+        variant: 'error'
+      });
     }
   };
 
@@ -267,7 +290,11 @@ export const Transactions: React.FC = () => {
       setEditData({});
     } catch (error) {
       console.error('Error updating transaction:', error);
-      alert('Error updating transaction. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error updating transaction. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setSavingEdit(false);
     }
@@ -286,7 +313,11 @@ export const Transactions: React.FC = () => {
       await fetchData();
     } catch (error) {
       console.error('Error uploading receipt:', error);
-      alert('Error uploading receipt. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error uploading receipt. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setUploadingReceipt(null);
     }
@@ -302,7 +333,15 @@ export const Transactions: React.FC = () => {
   };
 
   const handleReceiptDelete = async (transactionId: string, receiptUrl: string) => {
-    if (!confirm('Are you sure you want to delete this receipt?')) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Receipt',
+      message: 'Are you sure you want to delete this receipt?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
+
+    if (!confirmed) return;
 
     try {
       await deleteReceiptFile(receiptUrl);
@@ -314,35 +353,77 @@ export const Transactions: React.FC = () => {
       await fetchData();
     } catch (error) {
       console.error('Error deleting receipt:', error);
-      alert('Error deleting receipt. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting receipt. Please try again.',
+        variant: 'error'
+      });
     }
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
-    if (!confirm('Are you sure you want to delete this transaction?')) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Transaction',
+      message: 'Are you sure you want to delete this transaction?',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
 
+    if (!confirmed) return;
+
+    setConfirmLoading(true);
     try {
       await deleteTransaction(transactionId);
       await fetchData();
+      await showAlert({
+        title: 'Success',
+        message: 'Transaction deleted successfully',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error deleting transaction:', error);
-      alert('Error deleting transaction. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting transaction. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setConfirmLoading(false);
     }
   };
 
   const handleRecalculateBudgets = async () => {
-    if (!confirm('This will recalculate all budget spent amounts based on current transactions. Continue?')) return;
+    const confirmed = await showConfirm({
+      title: 'Recalculate Budgets',
+      message: 'This will recalculate all budget spent amounts based on current transactions. Continue?',
+      confirmText: 'Recalculate',
+      cancelText: 'Cancel',
+      variant: 'info'
+    });
 
+    if (!confirmed) return;
+
+    setConfirmLoading(true);
     try {
       setLoading(true);
       await recalculateAllBudgets();
       await fetchData();
-      alert('Budget recalculation completed successfully!');
+      await showAlert({
+        title: 'Success',
+        message: 'Budget recalculation completed successfully!',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error recalculating budgets:', error);
-      alert('Error recalculating budgets. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error recalculating budgets. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setLoading(false);
+      setConfirmLoading(false);
     }
   };
 
@@ -364,14 +445,26 @@ export const Transactions: React.FC = () => {
       setShowPOModal(null);
     } catch (error) {
       console.error('Error linking PO:', error);
-      alert('Error linking PO. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error linking PO. Please try again.',
+        variant: 'error'
+      });
     } finally {
       setLinkingPO(false);
     }
   };
 
   const handleUnlinkPO = async (transactionId: string) => {
-    if (!confirm('Are you sure you want to unlink this PO?')) return;
+    const confirmed = await showConfirm({
+      title: 'Unlink Purchase Order',
+      message: 'Are you sure you want to unlink this PO?',
+      confirmText: 'Unlink',
+      cancelText: 'Cancel',
+      variant: 'warning'
+    });
+
+    if (!confirmed) return;
 
     try {
       await updateTransaction(transactionId, {
@@ -382,7 +475,11 @@ export const Transactions: React.FC = () => {
       await fetchData();
     } catch (error) {
       console.error('Error unlinking PO:', error);
-      alert('Error unlinking PO. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error unlinking PO. Please try again.',
+        variant: 'error'
+      });
     }
   };
 
@@ -850,6 +947,27 @@ export const Transactions: React.FC = () => {
           </ul>
         </div>
       </Card>
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.options.title}
+        message={confirmModal.options.message}
+        confirmText={confirmModal.options.confirmText}
+        cancelText={confirmModal.options.cancelText}
+        variant={confirmModal.options.variant}
+        loading={confirmModal.loading}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };

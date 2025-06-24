@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { ExternalLink, Eye, Edit, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPOsByUser, deletePO } from '../../services/poService';
@@ -9,13 +10,14 @@ import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
 import { useNavigate } from 'react-router-dom';
+import { useModal } from '../../hooks/useModal';
 
 export const MyPOs: React.FC = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -37,20 +39,34 @@ export const MyPOs: React.FC = () => {
   };
 
   const handleDeletePO = async (poId: string, poName: string) => {
-    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await showConfirm({
+      title: 'Delete Purchase Order',
+      message: `Are you sure you want to delete "${poName}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
 
-    setDeleteLoading(poId);
+    if (!confirmed) return;
+
+    setConfirmLoading(true);
     try {
       await deletePO(poId);
       await fetchPOs(); // Refresh the list
-      alert('Purchase Order deleted successfully');
+      await showAlert({
+        title: 'Success',
+        message: 'Purchase Order deleted successfully',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error deleting PO:', error);
-      alert('Error deleting Purchase Order. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting Purchase Order. Please try again.',
+        variant: 'error'
+      });
     } finally {
-      setDeleteLoading(null);
+      setConfirmLoading(false);
     }
   };
 
@@ -336,8 +352,6 @@ export const MyPOs: React.FC = () => {
                             variant="danger" 
                             size="sm"
                             onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
-                            loading={deleteLoading === po.id}
-                            disabled={deleteLoading !== null}
                           >
                             <Trash2 className="h-4 w-4 mr-1" />
                             Delete
@@ -362,6 +376,27 @@ export const MyPOs: React.FC = () => {
           onPOUpdated={handlePOUpdated}
         />
       )}
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirm}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.options.title}
+        message={confirmModal.options.message}
+        confirmText={confirmModal.options.confirmText}
+        cancelText={confirmModal.options.cancelText}
+        variant={confirmModal.options.variant}
+        loading={confirmModal.loading}
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };
