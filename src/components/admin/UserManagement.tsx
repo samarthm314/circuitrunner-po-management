@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -19,7 +20,9 @@ import {
   Link as LinkIcon,
   Search,
   Filter,
-  UserCheck
+  UserCheck,
+  Lock,
+  User as UserIcon
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
@@ -34,6 +37,15 @@ interface UserImportData {
   displayName: string;
   role: 'director' | 'admin' | 'purchaser';
   roles?: ('director' | 'admin' | 'purchaser')[];
+}
+
+interface CreateUserFormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  displayName: string;
+  role: 'director' | 'admin' | 'purchaser' | 'guest';
+  roles: ('director' | 'admin' | 'purchaser')[];
 }
 
 export const UserManagement: React.FC = () => {
@@ -51,6 +63,20 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Create user modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createUserData, setCreateUserData] = useState<CreateUserFormData>({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    displayName: '',
+    role: 'director',
+    roles: []
+  });
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const availableRoles = ['guest', 'director', 'admin', 'purchaser'];
 
@@ -111,6 +137,128 @@ export const UserManagement: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    // Validation
+    if (!createUserData.email.trim()) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Email is required',
+        variant: 'error'
+      });
+      return;
+    }
+
+    if (!createUserData.email.endsWith('@circuitrunners.com')) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Email must end with @circuitrunners.com',
+        variant: 'error'
+      });
+      return;
+    }
+
+    if (!createUserData.displayName.trim()) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Display name is required',
+        variant: 'error'
+      });
+      return;
+    }
+
+    if (!createUserData.password) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Password is required',
+        variant: 'error'
+      });
+      return;
+    }
+
+    if (createUserData.password.length < 6) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Password must be at least 6 characters long',
+        variant: 'error'
+      });
+      return;
+    }
+
+    if (createUserData.password !== createUserData.confirmPassword) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Passwords do not match',
+        variant: 'error'
+      });
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      // Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        createUserData.email.trim(), 
+        createUserData.password
+      );
+
+      // Create user profile in Firestore
+      const userDoc: any = {
+        email: createUserData.email.trim(),
+        displayName: createUserData.displayName.trim(),
+        role: createUserData.role,
+        createdAt: new Date(),
+        authMethod: 'email'
+      };
+
+      if (createUserData.roles && createUserData.roles.length > 0) {
+        userDoc.roles = createUserData.roles;
+      }
+
+      await setDoc(doc(db, 'users', userCredential.user.uid), userDoc);
+
+      // Reset form and close modal
+      setCreateUserData({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        displayName: '',
+        role: 'director',
+        roles: []
+      });
+      setShowCreateModal(false);
+
+      // Refresh users list
+      await fetchUsers();
+
+      await showAlert({
+        title: 'Success',
+        message: `User ${createUserData.displayName} has been created successfully!`,
+        variant: 'success'
+      });
+
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      
+      let errorMessage = 'Error creating user. Please try again.';
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email address is already in use.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please choose a stronger password.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      }
+
+      await showAlert({
+        title: 'Error',
+        message: errorMessage,
+        variant: 'error'
+      });
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -445,6 +593,15 @@ export const UserManagement: React.FC = () => {
     setEditData({ ...editData, roles: newRoles });
   };
 
+  const toggleCreateUserRole = (role: 'director' | 'admin' | 'purchaser') => {
+    const currentRoles = createUserData.roles || [];
+    const newRoles = currentRoles.includes(role)
+      ? currentRoles.filter(r => r !== role)
+      : [...currentRoles, role];
+    
+    setCreateUserData({ ...createUserData, roles: newRoles });
+  };
+
   const toggleRoleFilter = (role: string) => {
     setSelectedRoles(prev => 
       prev.includes(role)
@@ -515,6 +672,14 @@ export const UserManagement: React.FC = () => {
           >
             <Upload className="h-4 w-4 mr-2" />
             Import Users
+          </Button>
+
+          <Button 
+            onClick={() => setShowCreateModal(true)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create User
           </Button>
         </div>
       </div>
@@ -847,6 +1012,197 @@ export const UserManagement: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Create User Modal */}
+      {showCreateModal && createPortal(
+        <div 
+          className="bg-black bg-opacity-75 flex items-center justify-center"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9999,
+            margin: 0,
+            padding: '16px'
+          }}
+        >
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700 relative z-[10000]">
+            <div className="flex justify-between items-center p-6 border-b border-gray-700">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-green-900/50 rounded-lg border border-green-700">
+                  <UserPlus className="h-5 w-5 text-green-400" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-100">Create New User</h2>
+              </div>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                disabled={creatingUser}
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    type="email"
+                    value={createUserData.email}
+                    onChange={(e) => setCreateUserData({ ...createUserData, email: e.target.value })}
+                    className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                    placeholder="user@circuitrunners.com"
+                    disabled={creatingUser}
+                  />
+                </div>
+              </div>
+
+              {/* Display Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Display Name <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    type="text"
+                    value={createUserData.displayName}
+                    onChange={(e) => setCreateUserData({ ...createUserData, displayName: e.target.value })}
+                    className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                    placeholder="John Doe"
+                    disabled={creatingUser}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Password <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={createUserData.password}
+                    onChange={(e) => setCreateUserData({ ...createUserData, password: e.target.value })}
+                    className="pl-10 pr-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                    placeholder="Enter password"
+                    disabled={creatingUser}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                    disabled={creatingUser}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Confirm Password <span className="text-red-400">*</span>
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={createUserData.confirmPassword}
+                    onChange={(e) => setCreateUserData({ ...createUserData, confirmPassword: e.target.value })}
+                    className="pl-10 pr-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                    placeholder="Confirm password"
+                    disabled={creatingUser}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                    disabled={creatingUser}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Primary Role */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Primary Role <span className="text-red-400">*</span>
+                </label>
+                <select
+                  value={createUserData.role}
+                  onChange={(e) => setCreateUserData({ ...createUserData, role: e.target.value as any })}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                  disabled={creatingUser}
+                >
+                  <option value="guest">Guest</option>
+                  <option value="director">Director</option>
+                  <option value="admin">Admin</option>
+                  <option value="purchaser">Purchaser</option>
+                </select>
+              </div>
+
+              {/* Additional Roles */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Additional Roles (Optional)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {(['director', 'admin', 'purchaser'] as const).map(role => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => toggleCreateUserRole(role)}
+                      disabled={creatingUser}
+                      className={`px-3 py-1 text-sm rounded border transition-colors ${
+                        createUserData.roles.includes(role)
+                          ? 'bg-green-600 border-green-500 text-white'
+                          : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                      } disabled:opacity-50`}
+                    >
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Users with multiple roles will have access to all features of their assigned roles
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateModal(false)}
+                disabled={creatingUser}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateUser}
+                loading={creatingUser}
+                disabled={creatingUser}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create User
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Alert Modal */}
       <AlertModal
