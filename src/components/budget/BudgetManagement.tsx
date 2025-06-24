@@ -2,15 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { Edit, Save, X, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
+import { AlertModal } from '../ui/Modal';
+import { Edit, Save, X, AlertTriangle, TrendingUp, TrendingDown, Download } from 'lucide-react';
 import { getSubOrganizations, updateSubOrgBudget } from '../../services/subOrgService';
 import { SubOrganization } from '../../types';
+import { useModal } from '../../hooks/useModal';
+import * as XLSX from 'xlsx';
 
 export const BudgetManagement: React.FC = () => {
+  const { alertModal, showAlert, closeAlert } = useModal();
   const [budgets, setBudgets] = useState<SubOrganization[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     const fetchBudgets = async () => {
@@ -40,7 +45,11 @@ export const BudgetManagement: React.FC = () => {
   const saveEdit = async (id: string) => {
     const newValue = parseFloat(editValue);
     if (isNaN(newValue) || newValue < 0) {
-      alert('Please enter a valid positive number');
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Please enter a valid positive number',
+        variant: 'error'
+      });
       return;
     }
 
@@ -54,9 +63,165 @@ export const BudgetManagement: React.FC = () => {
       
       setEditingId(null);
       setEditValue('');
+      
+      await showAlert({
+        title: 'Success',
+        message: 'Budget updated successfully',
+        variant: 'success'
+      });
     } catch (error) {
       console.error('Error updating budget:', error);
-      alert('Error updating budget. Please try again.');
+      await showAlert({
+        title: 'Error',
+        message: 'Error updating budget. Please try again.',
+        variant: 'error'
+      });
+    }
+  };
+
+  const handleExportBudgetReport = async () => {
+    setExportLoading(true);
+    try {
+      // Calculate totals
+      const totalAllocated = budgets.reduce((sum, budget) => sum + budget.budgetAllocated, 0);
+      const totalSpent = budgets.reduce((sum, budget) => sum + budget.budgetSpent, 0);
+      const totalRemaining = totalAllocated - totalSpent;
+
+      // Prepare summary data
+      const summaryData = [
+        {
+          'Metric': 'Total Budget Allocated',
+          'Amount': `$${totalAllocated.toLocaleString()}`,
+          'Percentage': '100.0%'
+        },
+        {
+          'Metric': 'Total Budget Spent',
+          'Amount': `$${totalSpent.toLocaleString()}`,
+          'Percentage': `${totalAllocated > 0 ? ((totalSpent / totalAllocated) * 100).toFixed(1) : 0}%`
+        },
+        {
+          'Metric': 'Total Budget Remaining',
+          'Amount': `$${totalRemaining.toLocaleString()}`,
+          'Percentage': `${totalAllocated > 0 ? ((totalRemaining / totalAllocated) * 100).toFixed(1) : 0}%`
+        }
+      ];
+
+      // Prepare detailed budget data
+      const budgetData = budgets.map(budget => {
+        const utilization = budget.budgetAllocated > 0 ? (budget.budgetSpent / budget.budgetAllocated) * 100 : 0;
+        const remaining = budget.budgetAllocated - budget.budgetSpent;
+        const status = utilization > 100 ? 'Over Budget' : 
+                     utilization > 90 ? 'Critical' : 
+                     utilization > 75 ? 'Warning' : 'Good';
+
+        return {
+          'Sub-Organization': budget.name,
+          'Budget Allocated': budget.budgetAllocated,
+          'Budget Spent': budget.budgetSpent,
+          'Budget Remaining': remaining,
+          'Utilization %': parseFloat(utilization.toFixed(1)),
+          'Status': status,
+          'Allocated (Formatted)': `$${budget.budgetAllocated.toLocaleString()}`,
+          'Spent (Formatted)': `$${budget.budgetSpent.toLocaleString()}`,
+          'Remaining (Formatted)': `$${remaining.toLocaleString()}`
+        };
+      });
+
+      // Sort by utilization percentage (highest first)
+      budgetData.sort((a, b) => b['Utilization %'] - a['Utilization %']);
+
+      // Prepare alerts data
+      const alertsData = budgets
+        .filter(budget => {
+          const utilization = budget.budgetAllocated > 0 ? (budget.budgetSpent / budget.budgetAllocated) * 100 : 0;
+          return utilization > 75;
+        })
+        .map(budget => {
+          const utilization = budget.budgetAllocated > 0 ? (budget.budgetSpent / budget.budgetSpent) * 100 : 0;
+          const remaining = budget.budgetAllocated - budget.budgetSpent;
+          
+          return {
+            'Sub-Organization': budget.name,
+            'Alert Type': utilization > 100 ? 'Over Budget' : 'High Usage',
+            'Utilization %': parseFloat(utilization.toFixed(1)),
+            'Amount Over/Under': remaining < 0 ? `$${Math.abs(remaining).toLocaleString()} over` : `$${remaining.toLocaleString()} remaining`,
+            'Priority': utilization > 100 ? 'High' : 'Medium',
+            'Recommendation': utilization > 100 ? 'Immediate attention required' : 'Monitor closely'
+          };
+        });
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Add Summary sheet
+      const summaryWs = XLSX.utils.json_to_sheet(summaryData);
+      
+      // Set column widths for summary
+      summaryWs['!cols'] = [
+        { wch: 25 }, // Metric
+        { wch: 20 }, // Amount
+        { wch: 15 }  // Percentage
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, summaryWs, 'Budget Summary');
+
+      // Add Detailed Budget sheet
+      const budgetWs = XLSX.utils.json_to_sheet(budgetData);
+      
+      // Set column widths for budget data
+      budgetWs['!cols'] = [
+        { wch: 25 }, // Sub-Organization
+        { wch: 15 }, // Budget Allocated
+        { wch: 15 }, // Budget Spent
+        { wch: 15 }, // Budget Remaining
+        { wch: 12 }, // Utilization %
+        { wch: 12 }, // Status
+        { wch: 18 }, // Allocated (Formatted)
+        { wch: 18 }, // Spent (Formatted)
+        { wch: 18 }  // Remaining (Formatted)
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, budgetWs, 'Detailed Budgets');
+
+      // Add Budget Alerts sheet (only if there are alerts)
+      if (alertsData.length > 0) {
+        const alertsWs = XLSX.utils.json_to_sheet(alertsData);
+        
+        // Set column widths for alerts
+        alertsWs['!cols'] = [
+          { wch: 25 }, // Sub-Organization
+          { wch: 15 }, // Alert Type
+          { wch: 12 }, // Utilization %
+          { wch: 20 }, // Amount Over/Under
+          { wch: 10 }, // Priority
+          { wch: 30 }  // Recommendation
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, alertsWs, 'Budget Alerts');
+      }
+
+      // Generate filename with current date
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `budget_report_${date}.xlsx`;
+
+      // Download file
+      XLSX.writeFile(wb, filename);
+
+      await showAlert({
+        title: 'Export Successful',
+        message: `Budget report has been exported successfully as "${filename}". The report includes budget summary, detailed breakdowns, and any budget alerts.`,
+        variant: 'success'
+      });
+
+    } catch (error) {
+      console.error('Error exporting budget report:', error);
+      await showAlert({
+        title: 'Export Error',
+        message: 'Error generating budget report. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -85,7 +250,13 @@ export const BudgetManagement: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-100">Budget Management</h1>
-        <Button variant="outline">
+        <Button 
+          variant="outline" 
+          onClick={handleExportBudgetReport}
+          loading={exportLoading}
+          disabled={exportLoading}
+        >
+          <Download className="h-4 w-4 mr-2" />
           Export Budget Report
         </Button>
       </div>
@@ -305,6 +476,37 @@ export const BudgetManagement: React.FC = () => {
           )}
         </div>
       </Card>
+
+      {/* Export Instructions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Export Information</CardTitle>
+        </CardHeader>
+        <div className="space-y-3 text-sm text-gray-300">
+          <p><strong className="text-gray-200">Budget Report Contents:</strong></p>
+          <ul className="list-disc list-inside space-y-1 ml-4">
+            <li><strong>Budget Summary:</strong> Overall totals and percentages</li>
+            <li><strong>Detailed Budgets:</strong> Complete breakdown by sub-organization with utilization metrics</li>
+            <li><strong>Budget Alerts:</strong> Organizations with high usage or over-budget status (if any)</li>
+          </ul>
+          <p className="mt-4"><strong className="text-gray-200">File Format:</strong></p>
+          <ul className="list-disc list-inside space-y-1 ml-4">
+            <li>Excel (.xlsx) format with multiple worksheets</li>
+            <li>Formatted for easy reading and analysis</li>
+            <li>Includes both raw numbers and formatted currency values</li>
+            <li>Sorted by utilization percentage for quick identification of issues</li>
+          </ul>
+        </div>
+      </Card>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </div>
   );
 };
