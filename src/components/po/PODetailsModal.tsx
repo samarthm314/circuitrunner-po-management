@@ -227,7 +227,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
   const showCheckboxes = isPurchaser && (po.status === 'approved' || po.status === 'pending_purchase' || po.status === 'purchased') && !shouldHideComments;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[99999] p-4">
+    <div className="fixed inset-0 w-full h-full min-h-screen bg-black bg-opacity-75 flex items-center justify-center z-[99999] p-4" style={{ top: 0, left: 0, right: 0, bottom: 0, position: 'fixed' }}>
       <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700 relative z-[100000]">
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-gray-700">
@@ -384,7 +384,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
                 Check off items as you purchase them. Items with checkmarks will show with strikethrough text.
                 {po.status === 'approved' && (
                   <span className="block mt-1 font-medium text-green-300">
-                    💡 Checking your first item will automatically update this PO status to "Pending Purchase"
+                    💡 Tip: Checking your first item will automatically update this PO status to "Pending Purchase"
                   </span>
                 )}
               </p>
