@@ -608,7 +608,7 @@ export const CreatePO: React.FC = () => {
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                     />
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
                     <div className="relative">
                       <input
