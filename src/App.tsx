@@ -11,6 +11,7 @@ import { PendingPurchase } from './components/po/PendingPurchase';
 import { AllPOs } from './components/po/AllPOs';
 import { BudgetManagement } from './components/budget/BudgetManagement';
 import { Transactions } from './components/transactions/Transactions';
+import { UserManagement } from './components/admin/UserManagement';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isGuest, loading } = useAuth();
@@ -53,6 +54,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/all-pos" element={<AllPOs />} />
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budget-management" element={<BudgetManagement />} />
+        <Route path="/user-management" element={<UserManagement />} />
         <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
     </Layout>

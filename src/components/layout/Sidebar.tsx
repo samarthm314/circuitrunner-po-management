@@ -9,7 +9,8 @@ import {
   CreditCard,
   Archive,
   Eye,
-  Heart
+  Heart,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -29,6 +30,7 @@ const navigation: NavItem[] = [
   { name: 'All POs', href: '/all-pos', icon: Archive, roles: ['admin', 'purchaser', 'guest'] },
   { name: 'Transactions', href: '/transactions', icon: CreditCard, roles: ['admin', 'purchaser', 'guest'] },
   { name: 'Budget Management', href: '/budget-management', icon: Settings, roles: ['admin'] },
+  { name: 'User Management', href: '/user-management', icon: Users, roles: ['admin'] },
 ];
 
 export const Sidebar: React.FC = () => {
