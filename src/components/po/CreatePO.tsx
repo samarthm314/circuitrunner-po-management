@@ -32,7 +32,7 @@ export const CreatePO: React.FC = () => {
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', notes: '', totalPrice: 0 }
   ]);
   
-  // Track the raw input values for price fields
+  // Track the raw input values for price fields (in cents)
   const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({
     '1': ''
   });
@@ -74,10 +74,16 @@ export const CreatePO: React.FC = () => {
         setOverBudgetJustification(po.overBudgetJustification || '');
         setLineItems(po.lineItems);
         
-        // Set up price inputs for existing line items
+        // Set up price inputs for existing line items (convert to cents display)
         const newPriceInputs: { [key: string]: string } = {};
         po.lineItems.forEach(item => {
-          newPriceInputs[item.id] = item.unitPrice > 0 ? item.unitPrice.toFixed(2) : '';
+          if (item.unitPrice > 0) {
+            // Convert dollars to cents for display
+            const cents = Math.round(item.unitPrice * 100);
+            newPriceInputs[item.id] = cents.toString();
+          } else {
+            newPriceInputs[item.id] = '';
+          }
         });
         setPriceInputs(newPriceInputs);
       } else {
@@ -142,38 +148,42 @@ export const CreatePO: React.FC = () => {
     }));
   };
 
+  // Format cents as currency display
+  const formatCentsAsCurrency = (cents: string): string => {
+    if (!cents) return '$0.00';
+    
+    // Ensure we have at least 2 digits (pad with leading zeros)
+    const paddedCents = cents.padStart(2, '0');
+    
+    // Split into dollars and cents
+    const dollarsStr = paddedCents.slice(0, -2) || '0';
+    const centsStr = paddedCents.slice(-2);
+    
+    // Format with commas for thousands
+    const dollars = parseInt(dollarsStr).toLocaleString();
+    
+    return `$${dollars}.${centsStr}`;
+  };
+
   const handlePriceChange = (id: string, value: string) => {
-    // Store the raw input value
-    setPriceInputs(prev => ({ ...prev, [id]: value }));
+    // Only allow digits
+    const digitsOnly = value.replace(/[^\d]/g, '');
     
-    // Clean the value for numeric conversion
-    const cleanValue = value.replace(/[^\d.]/g, '');
+    // Store the raw cents value
+    setPriceInputs(prev => ({ ...prev, [id]: digitsOnly }));
     
-    // Handle multiple decimal points - keep only the first one
-    const parts = cleanValue.split('.');
-    let formattedValue = parts[0];
-    if (parts.length > 1) {
-      formattedValue += '.' + parts.slice(1).join('').substring(0, 2);
-    }
-    
-    // Convert to number for storage
-    const numericValue = parseFloat(formattedValue) || 0;
-    updateLineItem(id, 'unitPrice', numericValue);
+    // Convert cents to dollars for storage
+    const cents = parseInt(digitsOnly) || 0;
+    const dollars = cents / 100;
+    updateLineItem(id, 'unitPrice', dollars);
   };
 
-  const handlePriceBlur = (id: string) => {
-    // Format the price when the user leaves the field
-    const item = lineItems.find(item => item.id === id);
-    if (item && item.unitPrice > 0) {
-      setPriceInputs(prev => ({ ...prev, [id]: item.unitPrice.toFixed(2) }));
-    }
-  };
-
-  const handlePriceFocus = (id: string) => {
-    // When focusing, show the raw numeric value without formatting
-    const item = lineItems.find(item => item.id === id);
-    if (item && item.unitPrice > 0) {
-      setPriceInputs(prev => ({ ...prev, [id]: item.unitPrice.toString() }));
+  const handlePriceKeyDown = (id: string, event: React.KeyboardEvent) => {
+    if (event.key === 'Backspace') {
+      const currentValue = priceInputs[id] || '';
+      const newValue = currentValue.slice(0, -1);
+      handlePriceChange(id, newValue);
+      event.preventDefault();
     }
   };
 
@@ -598,24 +608,23 @@ export const CreatePO: React.FC = () => {
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                     />
                   </div>
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price</label>
                     <div className="relative">
-                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm">$</span>
                       <input
                         type="text"
-                        value={priceInputs[item.id] || ''}
+                        value={formatCentsAsCurrency(priceInputs[item.id] || '')}
                         onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                        onFocus={() => handlePriceFocus(item.id)}
-                        onBlur={() => handlePriceBlur(item.id)}
-                        className="w-full pl-6 pr-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                        placeholder="0.00"
+                        onKeyDown={(e) => handlePriceKeyDown(item.id, e)}
+                        className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                        placeholder="$0.00"
                       />
                     </div>
+                    <p className="text-xs text-gray-400 mt-1">Type digits only (no decimal)</p>
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-2">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
-                    <div className="flex relative z-20">
+                    <div className="flex">
                       <input
                         type="url"
                         value={item.link}
@@ -628,7 +637,7 @@ export const CreatePO: React.FC = () => {
                           href={item.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-4 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center relative z-30"
+                          className="px-3 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center flex-shrink-0"
                           title="Open link"
                         >
                           <ExternalLink className="h-4 w-4 text-gray-300" />
@@ -636,13 +645,13 @@ export const CreatePO: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <div className="sm:col-span-2 lg:col-span-3">
+                  <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Notes (Optional)</label>
                     <input
                       type="text"
                       value={item.notes || ''}
                       onChange={(e) => updateLineItem(item.id, 'notes', e.target.value)}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400 relative z-10"
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="Additional notes or specifications..."
                     />
                   </div>
