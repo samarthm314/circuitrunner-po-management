@@ -1,17 +1,22 @@
 import React from 'react';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
 import { NotificationDropdown } from './NotificationDropdown';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 
 export const Header: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, isGuest, logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      if (isGuest) {
+        logout();
+      } else {
+        await signOut(auth);
+      }
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -31,18 +36,26 @@ export const Header: React.FC = () => {
             <h1 className="ml-2 text-xl font-bold text-gray-100 whitespace-nowrap">
               CircuitRunners PO System
             </h1>
+            {isGuest && (
+              <Badge variant="info" size="sm" className="ml-3">
+                <Eye className="h-3 w-3 mr-1" />
+                Guest Mode
+              </Badge>
+            )}
           </div>
           
           {/* Right side - User controls pushed all the way to the right */}
           <div className="flex items-center space-x-4 flex-shrink-0">
-            <NotificationDropdown />
+            {!isGuest && <NotificationDropdown />}
             
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-gray-400" />
                 <div className="text-sm">
                   <p className="font-medium text-gray-100">{userProfile?.displayName}</p>
-                  <p className="text-gray-400 capitalize">{userProfile?.role}</p>
+                  <p className="text-gray-400 capitalize">
+                    {isGuest ? 'Guest (Read-Only)' : userProfile?.role}
+                  </p>
                 </div>
               </div>
               

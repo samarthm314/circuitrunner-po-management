@@ -3,9 +3,11 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
-import { Mail, Lock } from 'lucide-react';
+import { Mail, Lock, Eye } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const Login: React.FC = () => {
+  const { loginAsGuest } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,6 +31,10 @@ export const Login: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuestLogin = () => {
+    loginAsGuest();
   };
 
   return (
@@ -100,6 +106,27 @@ export const Login: React.FC = () => {
             Sign In
           </Button>
         </form>
+
+        {/* Guest Access */}
+        <div className="mt-6 pt-6 border-t border-gray-700">
+          <div className="text-center mb-4">
+            <p className="text-sm text-gray-400">
+              Want to explore the system?
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleGuestLogin}
+            className="w-full"
+            size="lg"
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Continue as Guest
+          </Button>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            Read-only access to budget and purchase order data
+          </p>
+        </div>
 
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-400">

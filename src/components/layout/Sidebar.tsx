@@ -7,7 +7,8 @@ import {
   BarChart3, 
   Settings, 
   CreditCard,
-  Archive
+  Archive,
+  Eye
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -19,27 +20,39 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: BarChart3, roles: ['director', 'admin', 'purchaser'] },
+  { name: 'Dashboard', href: '/', icon: BarChart3, roles: ['director', 'admin', 'purchaser', 'guest'] },
   { name: 'Create PO', href: '/create-po', icon: FileText, roles: ['director', 'admin'] },
   { name: 'My POs', href: '/my-pos', icon: Clock, roles: ['director', 'admin'] },
   { name: 'Pending Approval', href: '/pending-approval', icon: CheckCircle, roles: ['admin'] },
   { name: 'Pending Purchase', href: '/pending-purchase', icon: CreditCard, roles: ['purchaser'] },
-  { name: 'All POs', href: '/all-pos', icon: Archive, roles: ['admin', 'purchaser'] },
+  { name: 'All POs', href: '/all-pos', icon: Archive, roles: ['admin', 'purchaser', 'guest'] },
   { name: 'Transactions', href: '/transactions', icon: CreditCard, roles: ['admin', 'purchaser'] },
   { name: 'Budget Management', href: '/budget-management', icon: Settings, roles: ['admin'] },
 ];
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { userProfile } = useAuth();
+  const { userProfile, isGuest } = useAuth();
 
   const filteredNavigation = navigation.filter(item => 
-    userProfile?.role && item.roles.includes(userProfile.role)
+    userProfile?.role && item.roles.includes(userProfile.role as string)
   );
 
   return (
     <div className="w-64 bg-gray-800 border-r border-gray-700 h-full">
       <nav className="mt-8 px-4">
+        {isGuest && (
+          <div className="mb-6 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+            <div className="flex items-center text-blue-300 mb-2">
+              <Eye className="h-4 w-4 mr-2" />
+              <span className="text-sm font-medium">Guest Mode</span>
+            </div>
+            <p className="text-xs text-blue-200">
+              You have read-only access to budget and PO data. No editing allowed.
+            </p>
+          </div>
+        )}
+        
         <ul className="space-y-2">
           {filteredNavigation.map((item) => {
             const isActive = location.pathname === item.href;

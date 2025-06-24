@@ -13,7 +13,7 @@ import { BudgetManagement } from './components/budget/BudgetManagement';
 import { Transactions } from './components/transactions/Transactions';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, isGuest, loading } = useAuth();
 
   if (loading) {
     return (
@@ -23,11 +23,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  return currentUser ? <>{children}</> : <Navigate to="/login" />;
+  return currentUser || isGuest ? <>{children}</> : <Navigate to="/login" />;
 };
 
 const AppRoutes: React.FC = () => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, isGuest, loading } = useAuth();
 
   if (loading) {
     return (
@@ -37,7 +37,7 @@ const AppRoutes: React.FC = () => {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser && !isGuest) {
     return <Login />;
   }
 

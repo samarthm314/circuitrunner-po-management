@@ -14,6 +14,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getDashboardStats, getRecentActivity } from '../../services/dashboardService';
 import { getSubOrganizations } from '../../services/subOrgService';
 import { SubOrganization } from '../../types';
+import { GuestDashboard } from './GuestDashboard';
 
 interface DashboardStats {
   totalPOs: number;
@@ -30,7 +31,7 @@ interface ActivityItem {
 }
 
 export const Dashboard: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, isGuest } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats>({
     totalPOs: 0,
@@ -41,6 +42,11 @@ export const Dashboard: React.FC = () => {
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // If user is a guest, show the guest dashboard
+  if (isGuest) {
+    return <GuestDashboard />;
+  }
 
   useEffect(() => {
     const fetchDashboardData = async () => {

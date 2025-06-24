@@ -2,29 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ExternalLink, Filter, Search, Eye, Trash2 } from 'lucide-react';
-import { getAllPOs, deletePO } from '../../services/poService';
+import { ExternalLink, Search, Eye, Info } from 'lucide-react';
+import { getAllPOs } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
-import { useAuth } from '../../contexts/AuthContext';
-import { GuestAllPOs } from './GuestAllPOs';
 
-export const AllPOs: React.FC = () => {
-  const { isGuest } = useAuth();
+export const GuestAllPOs: React.FC = () => {
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [filteredPOs, setFilteredPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // If user is a guest, show the guest version
-  if (isGuest) {
-    return <GuestAllPOs />;
-  }
 
   useEffect(() => {
     fetchAllPOs();
@@ -58,24 +49,6 @@ export const AllPOs: React.FC = () => {
       console.error('Error fetching all POs:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDeletePO = async (poId: string, poName: string) => {
-    if (!confirm(`Are you sure you want to delete "${poName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    setDeleteLoading(poId);
-    try {
-      await deletePO(poId);
-      await fetchAllPOs(); // Refresh the list
-      alert('Purchase Order deleted successfully');
-    } catch (error) {
-      console.error('Error deleting PO:', error);
-      alert('Error deleting Purchase Order. Please try again.');
-    } finally {
-      setDeleteLoading(null);
     }
   };
 
@@ -113,11 +86,6 @@ export const AllPOs: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedPO(null);
-  };
-
-  const handlePOUpdated = () => {
-    // Refresh the PO list when a PO is updated from the modal
-    fetchAllPOs();
   };
 
   // Group and sort POs by status
@@ -176,7 +144,25 @@ export const AllPOs: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-100">All Purchase Orders</h1>
+        <Badge variant="info" size="md">
+          <Eye className="h-4 w-4 mr-1" />
+          Guest View
+        </Badge>
       </div>
+
+      {/* Guest Notice */}
+      <Card className="border-blue-600 bg-blue-900/30">
+        <div className="flex items-start space-x-3">
+          <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+          <div>
+            <h3 className="text-blue-300 font-medium mb-1">Read-Only Access</h3>
+            <p className="text-blue-200 text-sm">
+              You're viewing all purchase orders in the system. As a guest, you can view details but cannot 
+              edit, delete, or create new purchase orders.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {/* Filters */}
       <Card>
@@ -303,16 +289,6 @@ export const AllPOs: React.FC = () => {
                           <Eye className="h-4 w-4 mr-1" />
                           View Details
                         </Button>
-                        <Button 
-                          variant="danger" 
-                          size="sm"
-                          onClick={() => handleDeletePO(po.id, po.name || `PO #${po.id.slice(-6).toUpperCase()}`)}
-                          loading={deleteLoading === po.id}
-                          disabled={deleteLoading !== null}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
                       </div>
                     </div>
                   </Card>
@@ -329,7 +305,7 @@ export const AllPOs: React.FC = () => {
           po={selectedPO}
           isOpen={isModalOpen}
           onClose={closeModal}
-          onPOUpdated={handlePOUpdated}
+          onPOUpdated={() => {}} // No updates allowed in guest mode
         />
       )}
     </div>
