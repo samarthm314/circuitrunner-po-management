@@ -14,7 +14,8 @@ import {
   Calendar,
   Building,
   Link,
-  Search
+  Search,
+  Eye
 } from 'lucide-react';
 import { Transaction, SubOrganization, PurchaseOrder } from '../../types';
 import { 
@@ -27,8 +28,9 @@ import {
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
-import { getPOsByStatus } from '../../services/poService';
+import { getPOsByStatus, getPOById } from '../../services/poService';
 import { useAuth } from '../../contexts/AuthContext';
+import { PODetailsModal } from '../po/PODetailsModal';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
@@ -49,6 +51,11 @@ export const Transactions: React.FC = () => {
   const [showPOModal, setShowPOModal] = useState<string | null>(null);
   const [poSearchTerm, setPOSearchTerm] = useState('');
   const [linkingPO, setLinkingPO] = useState(false);
+
+  // PO Details Modal State
+  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [isPODetailsModalOpen, setIsPODetailsModalOpen] = useState(false);
+  const [loadingPODetails, setLoadingPODetails] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -85,6 +92,29 @@ export const Transactions: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleViewPODetails = async (poId: string) => {
+    setLoadingPODetails(true);
+    try {
+      const po = await getPOById(poId);
+      if (po) {
+        setSelectedPO(po);
+        setIsPODetailsModalOpen(true);
+      } else {
+        alert('PO not found');
+      }
+    } catch (error) {
+      console.error('Error fetching PO details:', error);
+      alert('Error loading PO details');
+    } finally {
+      setLoadingPODetails(false);
+    }
+  };
+
+  const closePODetailsModal = () => {
+    setIsPODetailsModalOpen(false);
+    setSelectedPO(null);
   };
 
   const triggerFileUpload = () => {
@@ -621,9 +651,16 @@ export const Transactions: React.FC = () => {
                     <td className="py-4 px-4">
                       {transaction.linkedPOId ? (
                         <div className="flex items-center space-x-2">
-                          <Badge variant="info" size="sm">
-                            {transaction.linkedPOName || `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}`}
-                          </Badge>
+                          <button
+                            onClick={() => handleViewPODetails(transaction.linkedPOId!)}
+                            disabled={loadingPODetails}
+                            className="flex items-center space-x-1 hover:bg-gray-600 p-1 rounded transition-colors"
+                          >
+                            <Badge variant="info" size="sm">
+                              {transaction.linkedPOName || `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}`}
+                            </Badge>
+                            <Eye className="h-3 w-3 text-gray-400" />
+                          </button>
                           {!isGuest && (
                             <button
                               onClick={() => handleUnlinkPO(transaction.id)}
@@ -787,6 +824,16 @@ export const Transactions: React.FC = () => {
         </div>
       )}
 
+      {/* PO Details Modal */}
+      {selectedPO && (
+        <PODetailsModal
+          po={selectedPO}
+          isOpen={isPODetailsModalOpen}
+          onClose={closePODetailsModal}
+          onPOUpdated={() => {}} // No updates needed from transactions page
+        />
+      )}
+
       {/* Instructions */}
       <Card>
         <CardHeader>
@@ -809,6 +856,7 @@ export const Transactions: React.FC = () => {
             <li>After import, assign transactions to sub-organizations for budget tracking</li>
             <li>Budget spent amounts are automatically recalculated when transactions are allocated</li>
             <li>Link transactions to purchased POs for better tracking and reporting</li>
+            <li>Click on linked PO badges to view detailed purchase order information</li>
           </ul>
         </div>
       </Card>
