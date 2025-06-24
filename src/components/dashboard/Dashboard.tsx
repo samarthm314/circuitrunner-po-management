@@ -36,7 +36,7 @@ interface ActivityItem {
   time: string;
 }
 
-// Keys for localStorage
+// Keys for localStorage - only used for authenticated users with roles
 const SUB_ORG_FILTER_KEY = 'dashboard_subOrg_filter';
 const PO_SCOPE_FILTER_KEY = 'dashboard_po_scope_filter';
 
@@ -53,13 +53,22 @@ export const Dashboard: React.FC = () => {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Persistent filter states
+  // Determine if user should have persistent filters
+  const shouldPersistFilters = !isGuest && userProfile?.role && userProfile.role !== 'guest';
+  
+  // Filter states - only persistent for authenticated users with roles
   const [selectedSubOrg, setSelectedSubOrg] = useState<string>(() => {
-    return localStorage.getItem(SUB_ORG_FILTER_KEY) || 'all';
+    if (shouldPersistFilters) {
+      return localStorage.getItem(SUB_ORG_FILTER_KEY) || 'all';
+    }
+    return 'all';
   });
   const [poScope, setPOScope] = useState<'organization' | 'authored'>(() => {
-    const saved = localStorage.getItem(PO_SCOPE_FILTER_KEY);
-    return (saved as 'organization' | 'authored') || 'organization';
+    if (shouldPersistFilters) {
+      const saved = localStorage.getItem(PO_SCOPE_FILTER_KEY);
+      return (saved as 'organization' | 'authored') || 'organization';
+    }
+    return 'organization';
   });
 
   // Filtered data states
@@ -79,14 +88,29 @@ export const Dashboard: React.FC = () => {
     fetchTransactionData();
   }, [selectedSubOrg]);
 
-  // Save filter preferences to localStorage
+  // Save filter preferences to localStorage only for authenticated users with roles
   useEffect(() => {
-    localStorage.setItem(SUB_ORG_FILTER_KEY, selectedSubOrg);
-  }, [selectedSubOrg]);
+    if (shouldPersistFilters) {
+      localStorage.setItem(SUB_ORG_FILTER_KEY, selectedSubOrg);
+    }
+  }, [selectedSubOrg, shouldPersistFilters]);
 
   useEffect(() => {
-    localStorage.setItem(PO_SCOPE_FILTER_KEY, poScope);
-  }, [poScope]);
+    if (shouldPersistFilters) {
+      localStorage.setItem(PO_SCOPE_FILTER_KEY, poScope);
+    }
+  }, [poScope, shouldPersistFilters]);
+
+  // Clear filters when user becomes a guest or loses roles
+  useEffect(() => {
+    if (!shouldPersistFilters) {
+      setSelectedSubOrg('all');
+      setPOScope('organization');
+      // Also clear any existing localStorage entries
+      localStorage.removeItem(SUB_ORG_FILTER_KEY);
+      localStorage.removeItem(PO_SCOPE_FILTER_KEY);
+    }
+  }, [shouldPersistFilters]);
 
   const fetchDashboardData = async () => {
     try {
@@ -309,9 +333,16 @@ export const Dashboard: React.FC = () => {
                 {poScope !== 'organization' && (
                   <p>• PO statistics showing: <strong>Your authored POs only</strong></p>
                 )}
-                <p className="text-xs text-blue-300 mt-2">
-                  These filter preferences are saved and will persist across login sessions.
-                </p>
+                {shouldPersistFilters && (
+                  <p className="text-xs text-blue-300 mt-2">
+                    These filter preferences are saved and will persist across login sessions.
+                  </p>
+                )}
+                {!shouldPersistFilters && (
+                  <p className="text-xs text-blue-300 mt-2">
+                    Filter preferences are not saved and will reset when you refresh the page.
+                  </p>
+                )}
               </div>
             </div>
           </div>
