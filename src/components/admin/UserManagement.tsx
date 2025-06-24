@@ -14,10 +14,11 @@ import {
   X,
   Eye,
   EyeOff,
-  Plus
+  Plus,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, setDoc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../config/firebase';
 import { User } from '../../types';
@@ -39,6 +40,7 @@ export const UserManagement: React.FC = () => {
   const [importing, setImporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<User>>({});
+  const [sendingResetEmail, setSendingResetEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -63,6 +65,38 @@ export const UserManagement: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendPasswordReset = async (userEmail: string, userName: string) => {
+    setSendingResetEmail(userEmail);
+    try {
+      await sendPasswordResetEmail(auth, userEmail);
+      
+      await showAlert({
+        title: 'Password Reset Email Sent',
+        message: `A password reset email has been sent to ${userEmail}. ${userName} will receive instructions to reset their password.`,
+        variant: 'success'
+      });
+    } catch (error: any) {
+      console.error('Error sending password reset email:', error);
+      
+      let errorMessage = 'Error sending password reset email. Please try again.';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = `No user found with email ${userEmail}. The user may not exist in Firebase Authentication.`;
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = `Invalid email address: ${userEmail}`;
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many password reset requests. Please wait before trying again.';
+      }
+      
+      await showAlert({
+        title: 'Error',
+        message: errorMessage,
+        variant: 'error'
+      });
+    } finally {
+      setSendingResetEmail(null);
     }
   };
 
@@ -521,6 +555,16 @@ export const UserManagement: React.FC = () => {
                         </div>
                       ) : (
                         <div className="flex items-center justify-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSendPasswordReset(user.email, user.displayName)}
+                            loading={sendingResetEmail === user.email}
+                            disabled={sendingResetEmail !== null}
+                            title="Send password reset email"
+                          >
+                            <Mail className="h-3 w-3" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
