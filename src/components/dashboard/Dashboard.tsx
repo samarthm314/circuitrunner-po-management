@@ -274,6 +274,29 @@ export const Dashboard: React.FC = () => {
         </div>
       </Card>
 
+      {/* Filter Summary */}
+      {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
+        <Card className="border-blue-600 bg-blue-900/30">
+          <div className="flex items-start space-x-3">
+            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div>
+              <h3 className="text-blue-300 font-medium mb-1">Active Filters</h3>
+              <div className="text-blue-200 text-sm space-y-1">
+                {selectedSubOrg !== 'all' && (
+                  <p>• Budget view filtered to: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
+                )}
+                {poScope !== 'organization' && (
+                  <p>• PO statistics showing: <strong>Your authored POs only</strong></p>
+                )}
+                <p className="text-xs text-blue-300 mt-2">
+                  These filter preferences are saved and will persist across login sessions.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <Card className="p-4 sm:p-6">
@@ -472,28 +495,7 @@ export const Dashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Filter Summary */}
-      {(selectedSubOrg !== 'all' || poScope !== 'organization') && (
-        <Card className="border-blue-600 bg-blue-900/30">
-          <div className="flex items-start space-x-3">
-            <Info className="h-5 w-5 text-blue-400 mt-0.5" />
-            <div>
-              <h3 className="text-blue-300 font-medium mb-1">Active Filters</h3>
-              <div className="text-blue-200 text-sm space-y-1">
-                {selectedSubOrg !== 'all' && (
-                  <p>• Budget view filtered to: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
-                )}
-                {poScope !== 'organization' && (
-                  <p>• PO statistics showing: <strong>Your authored POs only</strong></p>
-                )}
-                <p className="text-xs text-blue-300 mt-2">
-                  These filter preferences are saved and will persist across login sessions.
-                </p>
-              </div>
-            </div>
-          </div>
-        </Card>
-      )}
+      
     </div>
   );
 };
