@@ -146,6 +146,63 @@ export const deleteReceiptFile = async (receiptUrl: string): Promise<void> => {
   }
 };
 
+// Helper function to parse dates from Excel data
+const parseExcelDate = (dateValue: any): Date => {
+  if (!dateValue) {
+    console.warn('No date value provided, using current date');
+    return new Date();
+  }
+
+  // If it's already a Date object
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+
+  // If it's a string, try to parse it
+  if (typeof dateValue === 'string') {
+    const parsed = new Date(dateValue);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+
+  // If it's a number (Excel serial date)
+  if (typeof dateValue === 'number') {
+    // Excel dates are stored as days since January 1, 1900
+    // But Excel incorrectly treats 1900 as a leap year, so we need to adjust
+    const excelEpoch = new Date(1900, 0, 1);
+    const msPerDay = 24 * 60 * 60 * 1000;
+    
+    // Subtract 2 days to account for Excel's leap year bug and 0-indexing
+    const adjustedDays = dateValue - 2;
+    const date = new Date(excelEpoch.getTime() + (adjustedDays * msPerDay));
+    
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  // If all else fails, try parsing as string one more time with different formats
+  if (typeof dateValue === 'string') {
+    // Try common date formats
+    const formats = [
+      dateValue,
+      dateValue.replace(/\//g, '-'),
+      dateValue.replace(/-/g, '/'),
+    ];
+
+    for (const format of formats) {
+      const parsed = new Date(format);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+  }
+
+  console.warn('Could not parse date value:', dateValue, 'using current date');
+  return new Date();
+};
+
 export const processExcelData = async (data: any[]): Promise<{ processed: number; skipped: number; errors: string[] }> => {
   let processed = 0;
   let skipped = 0;
@@ -176,9 +233,12 @@ export const processExcelData = async (data: any[]): Promise<{ processed: number
         continue;
       }
 
-      // Create transaction
+      // Parse the date from the spreadsheet
+      const postDate = parseExcelDate(row.postdate || row['post date'] || row.postDate || row['Post Date']);
+
+      // Create transaction with the actual date from the spreadsheet
       await createTransaction({
-        postDate: new Date(row.postDate || row['post date'] || Date.now()),
+        postDate: postDate,
         description: row.description.trim(),
         debitAmount: parseFloat(row.debit),
         status: row.status,

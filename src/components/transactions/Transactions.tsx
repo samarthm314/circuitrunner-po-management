@@ -79,9 +79,13 @@ export const Transactions: React.FC = () => {
     setProcessingExcel(true);
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = XLSX.read(data, { cellDates: true }); // Enable automatic date parsing
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1,
+        raw: false, // This helps with date formatting
+        dateNF: 'mm/dd/yyyy' // Specify date format
+      });
       
       // Convert to objects with proper headers
       const headers = jsonData[0] as string[];
@@ -93,6 +97,8 @@ export const Transactions: React.FC = () => {
         });
         return obj;
       });
+
+      console.log('Sample row for debugging:', rows[0]);
 
       const result = await processExcelData(rows);
       
@@ -558,7 +564,7 @@ export const Transactions: React.FC = () => {
         <div className="space-y-3 text-sm text-gray-300">
           <p><strong className="text-gray-200">Required Columns:</strong></p>
           <ul className="list-disc list-inside space-y-1 ml-4">
-            <li><strong>Post Date:</strong> Transaction date</li>
+            <li><strong>Post Date:</strong> Transaction date (will be parsed from spreadsheet)</li>
             <li><strong>Description:</strong> Transaction description</li>
             <li><strong>Debit:</strong> Transaction amount (must be positive)</li>
             <li><strong>Status:</strong> Must be "Posted" to be processed</li>
@@ -568,6 +574,7 @@ export const Transactions: React.FC = () => {
             <li>Only transactions with status "Posted" are imported</li>
             <li>Only transactions with positive debit amounts are imported</li>
             <li>Duplicate descriptions are automatically skipped</li>
+            <li>Transaction dates are parsed from the spreadsheet, not the upload date</li>
             <li>After import, assign transactions to sub-organizations for budget tracking</li>
             <li>Budget spent amounts are automatically recalculated when transactions are allocated</li>
           </ul>
