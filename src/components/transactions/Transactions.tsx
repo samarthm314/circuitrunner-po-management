@@ -37,6 +37,7 @@ export const Transactions: React.FC = () => {
   const [editData, setEditData] = useState<Partial<Transaction>>({});
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [processingExcel, setProcessingExcel] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -159,6 +160,7 @@ export const Transactions: React.FC = () => {
   };
 
   const saveEdit = async (transactionId: string) => {
+    setSavingEdit(true);
     try {
       const selectedSubOrg = subOrgs.find(org => org.id === editData.subOrgId);
       
@@ -179,14 +181,22 @@ export const Transactions: React.FC = () => {
         updateData.notes = editData.notes;
       }
 
+      // Update transaction (this will automatically trigger budget recalculation)
       await updateTransaction(transactionId, updateData);
       
-      await fetchData(); // Refresh data to show updated budgets
+      // Wait a moment for the budget recalculation to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh data to show updated budgets
+      await fetchData();
+      
       setEditingId(null);
       setEditData({});
     } catch (error) {
       console.error('Error updating transaction:', error);
       alert('Error updating transaction. Please try again.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -409,6 +419,7 @@ export const Transactions: React.FC = () => {
                           value={editData.subOrgId || ''}
                           onChange={(e) => setEditData({ ...editData, subOrgId: e.target.value })}
                           className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                          disabled={savingEdit}
                         >
                           <option value="" className="text-gray-100 bg-gray-700">Select organization</option>
                           {subOrgs.map(org => (
@@ -476,6 +487,7 @@ export const Transactions: React.FC = () => {
                           onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
                           className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                           placeholder="Add notes..."
+                          disabled={savingEdit}
                         />
                       ) : (
                         <span className="text-gray-300 text-sm">
@@ -489,6 +501,8 @@ export const Transactions: React.FC = () => {
                           <Button
                             size="sm"
                             onClick={() => saveEdit(transaction.id)}
+                            loading={savingEdit}
+                            disabled={savingEdit}
                           >
                             <Save className="h-3 w-3" />
                           </Button>
@@ -496,6 +510,7 @@ export const Transactions: React.FC = () => {
                             variant="ghost"
                             size="sm"
                             onClick={cancelEdit}
+                            disabled={savingEdit}
                           >
                             <X className="h-3 w-3" />
                           </Button>
