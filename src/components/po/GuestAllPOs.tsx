@@ -4,21 +4,25 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { ExternalLink, Search, Eye, Info } from 'lucide-react';
 import { getAllPOs } from '../../services/poService';
-import { PurchaseOrder } from '../../types';
+import { getSubOrganizations } from '../../services/subOrgService';
+import { PurchaseOrder, SubOrganization } from '../../types';
 import { format } from 'date-fns';
 import { PODetailsModal } from './PODetailsModal';
 
 export const GuestAllPOs: React.FC = () => {
   const [pos, setPOs] = useState<PurchaseOrder[]>([]);
+  const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
   const [filteredPOs, setFilteredPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [subOrgFilter, setSubOrgFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchAllPOs();
+    fetchSubOrganizations();
   }, []);
 
   useEffect(() => {
@@ -26,6 +30,10 @@ export const GuestAllPOs: React.FC = () => {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(po => po.status === statusFilter);
+    }
+
+    if (subOrgFilter !== 'all') {
+      filtered = filtered.filter(po => po.subOrgId === subOrgFilter);
     }
 
     if (searchTerm) {
@@ -38,7 +46,7 @@ export const GuestAllPOs: React.FC = () => {
     }
 
     setFilteredPOs(filtered);
-  }, [pos, statusFilter, searchTerm]);
+  }, [pos, statusFilter, subOrgFilter, searchTerm]);
 
   const fetchAllPOs = async () => {
     try {
@@ -49,6 +57,15 @@ export const GuestAllPOs: React.FC = () => {
       console.error('Error fetching all POs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSubOrganizations = async () => {
+    try {
+      const organizations = await getSubOrganizations();
+      setSubOrgs(organizations);
+    } catch (error) {
+      console.error('Error fetching sub-organizations:', error);
     }
   };
 
@@ -166,7 +183,7 @@ export const GuestAllPOs: React.FC = () => {
 
       {/* Filters */}
       <Card>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -179,20 +196,36 @@ export const GuestAllPOs: React.FC = () => {
               />
             </div>
           </div>
-          <div className="sm:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-            >
-              <option value="all" className="text-gray-100 bg-gray-700">All Statuses</option>
-              <option value="draft" className="text-gray-100 bg-gray-700">Draft</option>
-              <option value="pending_approval" className="text-gray-100 bg-gray-700">Pending Approval</option>
-              <option value="approved" className="text-gray-100 bg-gray-700">Approved</option>
-              <option value="declined" className="text-gray-100 bg-gray-700">Declined</option>
-              <option value="pending_purchase" className="text-gray-100 bg-gray-700">Pending Purchase</option>
-              <option value="purchased" className="text-gray-100 bg-gray-700">Purchased</option>
-            </select>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="sm:w-48">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+              >
+                <option value="all" className="text-gray-100 bg-gray-700">All Statuses</option>
+                <option value="draft" className="text-gray-100 bg-gray-700">Draft</option>
+                <option value="pending_approval" className="text-gray-100 bg-gray-700">Pending Approval</option>
+                <option value="approved" className="text-gray-100 bg-gray-700">Approved</option>
+                <option value="declined" className="text-gray-100 bg-gray-700">Declined</option>
+                <option value="pending_purchase" className="text-gray-100 bg-gray-700">Pending Purchase</option>
+                <option value="purchased" className="text-gray-100 bg-gray-700">Purchased</option>
+              </select>
+            </div>
+            <div className="sm:w-48">
+              <select
+                value={subOrgFilter}
+                onChange={(e) => setSubOrgFilter(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+              >
+                <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+                {subOrgs.map(org => (
+                  <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </Card>
@@ -200,7 +233,8 @@ export const GuestAllPOs: React.FC = () => {
       {/* Results */}
       <div className="text-sm text-gray-400 mb-4">
         Showing {filteredPOs.length} of {pos.length} purchase orders
-        {statusFilter !== 'all' && ` (filtered by ${statusFilter.replace('_', ' ')})`}
+        {statusFilter !== 'all' && ` (status: ${statusFilter.replace('_', ' ')})`}
+        {subOrgFilter !== 'all' && ` (organization: ${subOrgs.find(org => org.id === subOrgFilter)?.name})`}
         {searchTerm && ` (search: "${searchTerm}")`}
       </div>
 
