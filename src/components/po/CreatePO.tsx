@@ -292,14 +292,11 @@ export const CreatePO: React.FC = () => {
         status: 'draft'
       };
 
-      // Only add optional fields if they have values
-      if (specialRequest.trim()) {
-        poData.specialRequest = specialRequest.trim();
-      }
+      // Always include specialRequest field, even if empty (to clear it)
+      poData.specialRequest = specialRequest.trim() || null;
 
-      if (isOverBudget && overBudgetJustification.trim()) {
-        poData.overBudgetJustification = overBudgetJustification.trim();
-      }
+      // Always include overBudgetJustification field, even if empty (to clear it)
+      poData.overBudgetJustification = overBudgetJustification.trim() || null;
 
       // Clear admin comments when saving as draft (especially for declined POs)
       if (originalPOStatus === 'declined') {
@@ -366,14 +363,11 @@ export const CreatePO: React.FC = () => {
         status: 'pending_approval'
       };
 
-      // Only add optional fields if they have values
-      if (specialRequest.trim()) {
-        poData.specialRequest = specialRequest.trim();
-      }
+      // Always include specialRequest field, even if empty (to clear it)
+      poData.specialRequest = specialRequest.trim() || null;
 
-      if (isOverBudget && overBudgetJustification.trim()) {
-        poData.overBudgetJustification = overBudgetJustification.trim();
-      }
+      // Always include overBudgetJustification field, even if empty (to clear it)
+      poData.overBudgetJustification = overBudgetJustification.trim() || null;
 
       // Clear admin comments when resubmitting (especially for declined POs)
       if (originalPOStatus === 'declined') {
@@ -716,6 +710,9 @@ export const CreatePO: React.FC = () => {
             rows={3}
             placeholder="Any special instructions or requests..."
           />
+          <p className="text-xs text-gray-400 mt-2">
+            Leave blank if no special requests are needed. Clearing this field will remove any existing special request.
+          </p>
         </Card>
 
         {/* Over Budget Justification */}
