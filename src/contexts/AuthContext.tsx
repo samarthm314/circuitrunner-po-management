@@ -136,9 +136,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Clear all state
     setIsGuest(false);
     setCurrentUser(null);
     setUserProfile(null);
+    
+    // Clear any stored authentication data
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Force reload to ensure clean state
+    window.location.reload();
   };
 
   const value = {

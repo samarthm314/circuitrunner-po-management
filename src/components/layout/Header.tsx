@@ -13,16 +13,44 @@ export const Header: React.FC = () => {
   const { userProfile, isGuest, logout, getAllRoles, currentUser } = useAuth();
   const { alertModal, showAlert, closeAlert } = useModal();
   const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
       if (isGuest) {
+        // Handle guest logout
         logout();
       } else {
+        // For authenticated users (both email/password and Google)
+        // First sign out from Firebase Auth
         await signOut(auth);
+        
+        // Clear any local storage or session data
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Force a page reload to clear any cached authentication state
+        window.location.reload();
       }
     } catch (error) {
       console.error('Error signing out:', error);
+      
+      // If there's an error, try to force clear everything anyway
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload();
+      } catch (fallbackError) {
+        console.error('Fallback logout failed:', fallbackError);
+        await showAlert({
+          title: 'Logout Error',
+          message: 'There was an issue signing out. Please close your browser and try again.',
+          variant: 'error'
+        });
+      }
+    } finally {
+      setSigningOut(false);
     }
   };
 
@@ -156,7 +184,7 @@ export const Header: React.FC = () => {
                   size="sm"
                   onClick={handleLinkGoogleAccount}
                   loading={linkingGoogle}
-                  disabled={linkingGoogle}
+                  disabled={linkingGoogle || signingOut}
                   className="hidden sm:flex items-center px-2 sm:px-3"
                   title="Link Google Account"
                 >
@@ -169,6 +197,8 @@ export const Header: React.FC = () => {
                 variant="danger"
                 size="sm"
                 onClick={handleSignOut}
+                loading={signingOut}
+                disabled={signingOut}
                 className="flex items-center px-2 sm:px-3"
               >
                 <LogOut className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
