@@ -349,40 +349,6 @@ export const Transactions: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter Section */}
-      <Card>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="sm:w-64">
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Filter by Organization
-            </label>
-            <select
-              value={subOrgFilter}
-              onChange={(e) => setSubOrgFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-            >
-              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
-              <option value="unallocated" className="text-gray-100 bg-gray-700">Unallocated</option>
-              {subOrgs.map(org => (
-                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1 flex items-end">
-            <div className="text-sm text-gray-400">
-              Showing {filteredTransactions.length} of {transactions.length} transactions
-              {subOrgFilter !== 'all' && (
-                <span className="ml-2">
-                  (filtered by: {subOrgFilter === 'unallocated' ? 'Unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name})
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -441,6 +407,40 @@ export const Transactions: React.FC = () => {
           </div>
         </Card>
       </div>
+
+      {/* Filter Section */}
+      <Card>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="sm:w-64">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Filter by Organization
+            </label>
+            <select
+              value={subOrgFilter}
+              onChange={(e) => setSubOrgFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+              <option value="unallocated" className="text-gray-100 bg-gray-700">Unallocated</option>
+              {subOrgs.map(org => (
+                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 flex items-end">
+            <div className="text-sm text-gray-400">
+              Showing {filteredTransactions.length} of {transactions.length} transactions
+              {subOrgFilter !== 'all' && (
+                <span className="ml-2">
+                  (filtered by: {subOrgFilter === 'unallocated' ? 'Unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name})
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Transactions Table */}
       <Card>
