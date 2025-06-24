@@ -42,10 +42,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
-            setUserProfile({ id: user.uid, ...userDoc.data() } as User);
+            const userData = userDoc.data();
+            setUserProfile({ 
+              id: user.uid, 
+              ...userData,
+              createdAt: userData.createdAt?.toDate() || new Date()
+            } as User);
+          } else {
+            // User exists in Firebase Auth but not in Firestore
+            // This shouldn't happen with proper setup, but handle gracefully
+            console.warn('User authenticated but no profile found in Firestore');
+            setUserProfile(null);
           }
         } catch (error) {
           console.error('Error fetching user profile:', error);
+          setUserProfile(null);
         }
       } else if (!user && !isGuest) {
         setUserProfile(null);

@@ -1,14 +1,18 @@
-import React from 'react';
-import { LogOut, User, Eye, Menu } from 'lucide-react';
+import React, { useState } from 'react';
+import { LogOut, User, Eye, Menu, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { AlertModal } from '../ui/Modal';
 import { NotificationDropdown } from './NotificationDropdown';
-import { signOut } from 'firebase/auth';
+import { signOut, linkWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../config/firebase';
+import { useModal } from '../../hooks/useModal';
 
 export const Header: React.FC = () => {
-  const { userProfile, isGuest, logout, getAllRoles } = useAuth();
+  const { userProfile, isGuest, logout, getAllRoles, currentUser } = useAuth();
+  const { alertModal, showAlert, closeAlert } = useModal();
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -22,10 +26,57 @@ export const Header: React.FC = () => {
     }
   };
 
+  const handleLinkGoogleAccount = async () => {
+    if (!currentUser || isGuest) return;
+
+    setLinkingGoogle(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        hd: 'circuitrunners.com'
+      });
+
+      await linkWithPopup(currentUser, provider);
+      
+      await showAlert({
+        title: 'Success!',
+        message: 'Your Google account has been successfully linked. You can now sign in using either method.',
+        variant: 'success'
+      });
+
+    } catch (error: any) {
+      console.error('Error linking Google account:', error);
+      
+      let errorMessage = 'Failed to link Google account. Please try again.';
+      
+      if (error.code === 'auth/credential-already-in-use') {
+        errorMessage = 'This Google account is already linked to another user.';
+      } else if (error.code === 'auth/provider-already-linked') {
+        errorMessage = 'A Google account is already linked to your profile.';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = '';
+      }
+
+      if (errorMessage) {
+        await showAlert({
+          title: 'Linking Failed',
+          message: errorMessage,
+          variant: 'error'
+        });
+      }
+    } finally {
+      setLinkingGoogle(false);
+    }
+  };
+
   const userRoles = getAllRoles();
   const displayRoles = userRoles.length > 1 
     ? `${userRoles.length} roles` 
     : userRoles[0]?.charAt(0).toUpperCase() + userRoles[0]?.slice(1);
+
+  // Check if user has Google provider linked
+  const hasGoogleLinked = currentUser?.providerData.some(provider => provider.providerId === 'google.com');
+  const hasPasswordProvider = currentUser?.providerData.some(provider => provider.providerId === 'password');
 
   return (
     <header className="bg-gray-800 shadow-sm border-b border-gray-700 relative z-40">
@@ -80,6 +131,22 @@ export const Header: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Google Account Linking Button */}
+              {!isGuest && hasPasswordProvider && !hasGoogleLinked && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLinkGoogleAccount}
+                  loading={linkingGoogle}
+                  disabled={linkingGoogle}
+                  className="hidden sm:flex items-center px-2 sm:px-3"
+                  title="Link Google Account"
+                >
+                  <LinkIcon className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Link Google</span>
+                </Button>
+              )}
               
               <Button
                 variant="danger"
@@ -94,6 +161,15 @@ export const Header: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={closeAlert}
+        title={alertModal.options.title}
+        message={alertModal.options.message}
+        variant={alertModal.options.variant}
+      />
     </header>
   );
 };
