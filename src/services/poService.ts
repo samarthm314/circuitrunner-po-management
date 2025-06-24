@@ -56,7 +56,8 @@ export const updatePO = async (poId: string, updates: Partial<PurchaseOrder>) =>
 export const updatePOStatus = async (
   poId: string, 
   status: PurchaseOrder['status'], 
-  adminComments?: string
+  adminComments?: string,
+  purchaserComments?: string
 ) => {
   try {
     const updateData: any = {
@@ -66,6 +67,10 @@ export const updatePOStatus = async (
 
     if (adminComments) {
       updateData.adminComments = adminComments;
+    }
+
+    if (purchaserComments) {
+      updateData.purchaserComments = purchaserComments;
     }
 
     if (status === 'approved') {

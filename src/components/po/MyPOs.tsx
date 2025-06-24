@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ExternalLink, Eye, Edit, Trash2, RefreshCw } from 'lucide-react';
+import { ExternalLink, Eye, Edit, Trash2, RefreshCw, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPOsByUser, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
@@ -259,6 +259,19 @@ export const MyPOs: React.FC = () => {
                                 <p className="text-xs text-red-300 mt-2 italic">
                                   You can edit this PO to address the concerns and resubmit for approval.
                                 </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Show purchaser comments for purchased POs */}
+                          {po.status === 'purchased' && po.purchaserComments && (
+                            <div className="mt-3 p-3 bg-green-900/30 border border-green-700 rounded-lg">
+                              <div className="flex items-start space-x-2">
+                                <MessageSquare className="h-4 w-4 text-green-400 mt-0.5" />
+                                <div>
+                                  <span className="text-sm font-medium text-green-300">Purchaser Comments:</span>
+                                  <p className="text-sm text-green-200 mt-1">{po.purchaserComments}</p>
+                                </div>
                               </div>
                             </div>
                           )}

@@ -36,6 +36,7 @@ export interface PurchaseOrder {
   lineItems: LineItem[];
   totalAmount: number;
   adminComments?: string;
+  purchaserComments?: string; // Added purchaser comments field
   overBudgetJustification?: string;
   createdAt: Date;
   updatedAt: Date;

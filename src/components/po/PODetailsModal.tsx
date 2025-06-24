@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ExternalLink, Calendar, User, Building, DollarSign, Download } from 'lucide-react';
+import { X, ExternalLink, Calendar, User, Building, DollarSign, Download, MessageSquare } from 'lucide-react';
 import { PurchaseOrder } from '../../types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -68,7 +68,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
     if (anyItemsChecked && po.status === 'approved' && userProfile?.role === 'purchaser') {
       setUpdatingStatus(true);
       try {
-        await updatePOStatus(po.id, 'pending_purchase', 'Purchaser has started working on this PO');
+        await updatePOStatus(po.id, 'pending_purchase', undefined, 'Purchaser has started working on this PO');
         
         // Call the callback to refresh the PO data in parent components
         if (onPOUpdated) {
@@ -109,7 +109,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
         'Purchased Date': po.purchasedAt ? format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Special Request': po.specialRequest || 'None',
         'Over Budget Justification': po.overBudgetJustification || 'N/A',
-        'Admin Comments': po.adminComments || 'None'
+        'Admin Comments': po.adminComments || 'None',
+        'Purchaser Comments': po.purchaserComments || 'None'
       };
 
       // Prepare line items data
@@ -283,6 +284,19 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({ po, isOpen, onCl
             <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
               <h3 className="font-medium text-gray-200 mb-2">Admin Comments</h3>
               <p className="text-gray-300">{po.adminComments}</p>
+            </div>
+          )}
+
+          {/* Purchaser Comments */}
+          {po.purchaserComments && (
+            <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
+              <div className="flex items-start space-x-2">
+                <MessageSquare className="h-4 w-4 text-green-400 mt-0.5" />
+                <div>
+                  <h3 className="font-medium text-green-300 mb-2">Purchaser Comments</h3>
+                  <p className="text-green-200">{po.purchaserComments}</p>
+                </div>
+              </div>
             </div>
           )}
 

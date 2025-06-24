@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ExternalLink, ShoppingCart, Eye, Receipt, Trash2 } from 'lucide-react';
+import { ExternalLink, ShoppingCart, Eye, Receipt, Trash2, MessageSquare } from 'lucide-react';
 import { getPOsByStatus, updatePOStatus, deletePO } from '../../services/poService';
 import { PurchaseOrder } from '../../types';
 import { format } from 'date-fns';
@@ -15,6 +15,8 @@ export const PendingPurchase: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showCommentModal, setShowCommentModal] = useState<string | null>(null);
+  const [purchaserComment, setPurchaserComment] = useState('');
 
   useEffect(() => {
     fetchPendingPurchasePOs();
@@ -44,16 +46,33 @@ export const PendingPurchase: React.FC = () => {
   };
 
   const handleMarkAsPurchased = async (poId: string) => {
+    setShowCommentModal(poId);
+    setPurchaserComment('');
+  };
+
+  const confirmMarkAsPurchased = async (poId: string) => {
     setActionLoading(poId);
     try {
-      await updatePOStatus(poId, 'purchased', 'Marked as purchased by purchaser');
+      await updatePOStatus(
+        poId, 
+        'purchased', 
+        undefined, // adminComments
+        purchaserComment.trim() || 'Marked as purchased by purchaser'
+      );
       await fetchPendingPurchasePOs();
+      setShowCommentModal(null);
+      setPurchaserComment('');
     } catch (error) {
       console.error('Error marking PO as purchased:', error);
       alert('Error marking PO as purchased. Please try again.');
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const cancelMarkAsPurchased = () => {
+    setShowCommentModal(null);
+    setPurchaserComment('');
   };
 
   const handleDeletePO = async (poId: string, poName: string) => {
@@ -200,6 +219,13 @@ export const PendingPurchase: React.FC = () => {
                       </div>
                     )}
 
+                    {po.purchaserComments && (
+                      <div className="bg-green-900/30 border border-green-700 p-3 rounded-lg mb-4">
+                        <span className="text-sm font-medium text-green-300">Purchaser Comments:</span>
+                        <p className="text-sm text-green-200 mt-1">{po.purchaserComments}</p>
+                      </div>
+                    )}
+
                     {/* Status indicator for pending_purchase */}
                     {po.status === 'pending_purchase' && (
                       <div className="bg-yellow-900/30 border border-yellow-700 p-3 rounded-lg mb-4">
@@ -315,7 +341,7 @@ export const PendingPurchase: React.FC = () => {
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">4</span>
-            <p>Mark the PO as "Purchased" when all items are complete</p>
+            <p>Mark the PO as "Purchased" when all items are complete and add any relevant comments</p>
           </div>
           <div className="flex items-start space-x-2">
             <span className="bg-green-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold mt-0.5">5</span>
@@ -323,6 +349,50 @@ export const PendingPurchase: React.FC = () => {
           </div>
         </div>
       </Card>
+
+      {/* Purchaser Comment Modal */}
+      {showCommentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full border border-gray-700">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <MessageSquare className="h-5 w-5 text-green-400 mr-2" />
+                <h3 className="text-lg font-semibold text-gray-100">Mark as Purchased</h3>
+              </div>
+              
+              <p className="text-gray-300 mb-4">
+                Add any comments about the purchase process, delivery details, or other relevant information:
+              </p>
+              
+              <textarea
+                value={purchaserComment}
+                onChange={(e) => setPurchaserComment(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                rows={4}
+                placeholder="e.g., All items purchased from Amazon, delivery expected by Friday, substituted part XYZ with compatible alternative..."
+              />
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={cancelMarkAsPurchased}
+                  disabled={actionLoading !== null}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => confirmMarkAsPurchased(showCommentModal)}
+                  loading={actionLoading === showCommentModal}
+                  disabled={actionLoading !== null}
+                >
+                  <ShoppingCart className="h-4 w-4 mr-2" />
+                  Mark as Purchased
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* PO Details Modal */}
       {selectedPO && (
