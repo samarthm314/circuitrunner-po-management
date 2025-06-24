@@ -35,10 +35,10 @@ const navigation: NavItem[] = [
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  const { userProfile, isGuest } = useAuth();
+  const { userProfile, isGuest, hasRole } = useAuth();
 
   const filteredNavigation = navigation.filter(item => 
-    userProfile?.role && item.roles.includes(userProfile.role as string)
+    item.roles.some(role => hasRole(role))
   );
 
   return (

@@ -13,7 +13,8 @@ import {
   Save,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  Plus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -27,17 +28,17 @@ interface UserImportData {
   password: string;
   displayName: string;
   role: 'director' | 'admin' | 'purchaser';
+  roles?: ('director' | 'admin' | 'purchaser')[];
 }
 
 export const UserManagement: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, hasRole } = useAuth();
   const { alertModal, showAlert, closeAlert } = useModal();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<User>>({});
-  const [showPasswords, setShowPasswords] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
     fetchUsers();
@@ -86,6 +87,13 @@ export const UserManagement: React.FC = () => {
         if (!['director', 'admin', 'purchaser'].includes(user.role)) {
           throw new Error('Role must be one of: director, admin, purchaser');
         }
+        if (user.roles) {
+          for (const role of user.roles) {
+            if (!['director', 'admin', 'purchaser'].includes(role)) {
+              throw new Error('Additional roles must be one of: director, admin, purchaser');
+            }
+          }
+        }
         if (!user.email.endsWith('@circuitrunners.com')) {
           throw new Error('All emails must end with @circuitrunners.com');
         }
@@ -104,12 +112,18 @@ export const UserManagement: React.FC = () => {
           );
 
           // Create user profile in Firestore
-          await setDoc(doc(db, 'users', userCredential.user.uid), {
+          const userDoc: any = {
             email: userData.email,
             displayName: userData.displayName,
             role: userData.role,
             createdAt: new Date()
-          });
+          };
+
+          if (userData.roles && userData.roles.length > 0) {
+            userDoc.roles = userData.roles;
+          }
+
+          await setDoc(doc(db, 'users', userCredential.user.uid), userDoc);
 
           created++;
         } catch (error: any) {
@@ -158,13 +172,15 @@ export const UserManagement: React.FC = () => {
         email: "jane.admin@circuitrunners.com",
         password: "AdminPass456!",
         displayName: "Jane Admin",
-        role: "admin"
+        role: "admin",
+        roles: ["admin", "purchaser"]
       },
       {
-        email: "bob.purchaser@circuitrunners.com",
-        password: "PurchasePass789!",
-        displayName: "Bob Purchaser",
-        role: "purchaser"
+        email: "bob.multi@circuitrunners.com",
+        password: "MultiRole789!",
+        displayName: "Bob Multi-Role",
+        role: "director",
+        roles: ["director", "admin"]
       }
     ];
 
@@ -183,7 +199,8 @@ export const UserManagement: React.FC = () => {
     setEditingId(user.id);
     setEditData({
       displayName: user.displayName,
-      role: user.role
+      role: user.role,
+      roles: user.roles || []
     });
   };
 
@@ -194,11 +211,19 @@ export const UserManagement: React.FC = () => {
 
   const saveEdit = async (userId: string) => {
     try {
-      await updateDoc(doc(db, 'users', userId), {
+      const updateData: any = {
         displayName: editData.displayName,
         role: editData.role,
         updatedAt: new Date()
-      });
+      };
+
+      if (editData.roles && editData.roles.length > 0) {
+        updateData.roles = editData.roles;
+      } else {
+        updateData.roles = null; // Remove roles field if empty
+      }
+
+      await updateDoc(doc(db, 'users', userId), updateData);
 
       await fetchUsers();
       setEditingId(null);
@@ -243,7 +268,16 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const getRoleBadge = (role: string) => {
+  const getRoleBadges = (user: User) => {
+    const allRoles = [user.role];
+    if (user.roles) {
+      user.roles.forEach(role => {
+        if (!allRoles.includes(role)) {
+          allRoles.push(role);
+        }
+      });
+    }
+
     const variants = {
       director: 'info',
       admin: 'success',
@@ -251,20 +285,31 @@ export const UserManagement: React.FC = () => {
     } as const;
 
     return (
-      <Badge variant={variants[role as keyof typeof variants] || 'default'}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
-      </Badge>
+      <div className="flex flex-wrap gap-1">
+        {allRoles.map((role, index) => (
+          <Badge 
+            key={`${role}-${index}`} 
+            variant={variants[role as keyof typeof variants] || 'default'}
+            size="sm"
+          >
+            {role.charAt(0).toUpperCase() + role.slice(1)}
+            {index === 0 && <span className="ml-1 text-xs opacity-75">(Primary)</span>}
+          </Badge>
+        ))}
+      </div>
     );
   };
 
-  const togglePasswordVisibility = (userId: string) => {
-    setShowPasswords(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
+  const toggleRole = (role: 'director' | 'admin' | 'purchaser') => {
+    const currentRoles = editData.roles || [];
+    const newRoles = currentRoles.includes(role)
+      ? currentRoles.filter(r => r !== role)
+      : [...currentRoles, role];
+    
+    setEditData({ ...editData, roles: newRoles });
   };
 
-  if (userProfile?.role !== 'admin') {
+  if (!hasRole('admin')) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -330,7 +375,8 @@ export const UserManagement: React.FC = () => {
     "email": "user@circuitrunners.com",
     "password": "SecurePassword123!",
     "displayName": "User Name",
-    "role": "director"
+    "role": "director",
+    "roles": ["director", "admin"]
   }
 ]`}
             </pre>
@@ -339,10 +385,11 @@ export const UserManagement: React.FC = () => {
             <li><strong>email:</strong> Must end with @circuitrunners.com</li>
             <li><strong>password:</strong> Strong password (Firebase requirements apply)</li>
             <li><strong>displayName:</strong> Full name for display</li>
-            <li><strong>role:</strong> Must be "director", "admin", or "purchaser"</li>
+            <li><strong>role:</strong> Primary role - "director", "admin", or "purchaser"</li>
+            <li><strong>roles:</strong> (Optional) Array of additional roles for multi-role users</li>
           </ul>
           <p className="text-yellow-300">
-            <strong>Note:</strong> Download the template for the correct format and example data.
+            <strong>Note:</strong> Users with multiple roles will have access to all features of their assigned roles.
           </p>
         </div>
       </Card>
@@ -364,7 +411,7 @@ export const UserManagement: React.FC = () => {
               <tr className="border-b border-gray-600">
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Name</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Email</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-200">Role</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Roles</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Created</th>
                 <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
               </tr>
@@ -392,17 +439,41 @@ export const UserManagement: React.FC = () => {
                     </td>
                     <td className="py-4 px-4">
                       {isEditing ? (
-                        <select
-                          value={editData.role || ''}
-                          onChange={(e) => setEditData({ ...editData, role: e.target.value as any })}
-                          className="px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                        >
-                          <option value="director">Director</option>
-                          <option value="admin">Admin</option>
-                          <option value="purchaser">Purchaser</option>
-                        </select>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-300 mb-1">Primary Role</label>
+                            <select
+                              value={editData.role || ''}
+                              onChange={(e) => setEditData({ ...editData, role: e.target.value as any })}
+                              className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                            >
+                              <option value="director">Director</option>
+                              <option value="admin">Admin</option>
+                              <option value="purchaser">Purchaser</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-300 mb-1">Additional Roles</label>
+                            <div className="flex flex-wrap gap-2">
+                              {(['director', 'admin', 'purchaser'] as const).map(role => (
+                                <button
+                                  key={role}
+                                  type="button"
+                                  onClick={() => toggleRole(role)}
+                                  className={`px-2 py-1 text-xs rounded border transition-colors ${
+                                    (editData.roles || []).includes(role)
+                                      ? 'bg-green-600 border-green-500 text-white'
+                                      : 'bg-gray-600 border-gray-500 text-gray-300 hover:bg-gray-500'
+                                  }`}
+                                >
+                                  {role.charAt(0).toUpperCase() + role.slice(1)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       ) : (
-                        getRoleBadge(user.role)
+                        getRoleBadges(user)
                       )}
                     </td>
                     <td className="py-4 px-4 text-gray-300 text-sm">

@@ -3,6 +3,7 @@ export interface User {
   email: string;
   displayName: string;
   role: 'director' | 'admin' | 'purchaser' | 'guest';
+  roles?: ('director' | 'admin' | 'purchaser')[]; // New field for multiple roles
   createdAt: Date;
 }
 

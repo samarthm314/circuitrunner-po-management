@@ -22,7 +22,7 @@ export interface Notification {
   icon: string;
 }
 
-export const getNotificationsForUser = async (userRole: string): Promise<Notification[]> => {
+export const getNotificationsForUser = async (userRoles: string[]): Promise<Notification[]> => {
   const notifications: Notification[] = [];
   
   try {
@@ -35,21 +35,28 @@ export const getNotificationsForUser = async (userRole: string): Promise<Notific
     // Get recent transactions
     const recentTransactions = await getRecentTransactions();
 
-    // Generate role-based notifications
-    switch (userRole) {
-      case 'director':
-        notifications.push(...generateDirectorNotifications(recentPOs, subOrgs));
-        break;
-      case 'admin':
-        notifications.push(...generateAdminNotifications(recentPOs, subOrgs, recentTransactions));
-        break;
-      case 'purchaser':
-        notifications.push(...generatePurchaserNotifications(recentPOs, recentTransactions));
-        break;
-    }
+    // Generate role-based notifications for each role the user has
+    userRoles.forEach(role => {
+      switch (role) {
+        case 'director':
+          notifications.push(...generateDirectorNotifications(recentPOs, subOrgs));
+          break;
+        case 'admin':
+          notifications.push(...generateAdminNotifications(recentPOs, subOrgs, recentTransactions));
+          break;
+        case 'purchaser':
+          notifications.push(...generatePurchaserNotifications(recentPOs, recentTransactions));
+          break;
+      }
+    });
+
+    // Remove duplicates based on notification ID
+    const uniqueNotifications = notifications.filter((notification, index, self) =>
+      index === self.findIndex(n => n.id === notification.id)
+    );
 
     // Sort by priority and timestamp
-    return notifications.sort((a, b) => {
+    return uniqueNotifications.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
         return priorityOrder[b.priority] - priorityOrder[a.priority];
@@ -284,7 +291,7 @@ const generateCriticalBudgetAlerts = (subOrgs: SubOrganization[]): Notification[
   return notifications;
 };
 
-export const getNotificationCount = async (userRole: string): Promise<number> => {
-  const notifications = await getNotificationsForUser(userRole);
+export const getNotificationCount = async (userRoles: string[]): Promise<number> => {
+  const notifications = await getNotificationsForUser(userRoles);
   return notifications.filter(n => !n.isRead).length;
 };

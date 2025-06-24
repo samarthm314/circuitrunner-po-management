@@ -11,6 +11,8 @@ interface AuthContextType {
   isGuest: boolean;
   loginAsGuest: () => void;
   logout: () => void;
+  hasRole: (role: string) => boolean;
+  getAllRoles: () => string[];
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -20,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   isGuest: false,
   loginAsGuest: () => {},
   logout: () => {},
+  hasRole: () => false,
+  getAllRoles: () => [],
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -53,6 +57,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, [isGuest]);
 
+  const hasRole = (role: string): boolean => {
+    if (!userProfile) return false;
+    
+    // Check primary role
+    if (userProfile.role === role) return true;
+    
+    // Check additional roles
+    if (userProfile.roles && userProfile.roles.includes(role as any)) return true;
+    
+    return false;
+  };
+
+  const getAllRoles = (): string[] => {
+    if (!userProfile) return [];
+    
+    const roles = [userProfile.role];
+    if (userProfile.roles) {
+      userProfile.roles.forEach(role => {
+        if (!roles.includes(role)) {
+          roles.push(role);
+        }
+      });
+    }
+    
+    return roles;
+  };
+
   const loginAsGuest = () => {
     setIsGuest(true);
     setCurrentUser(null);
@@ -79,6 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isGuest,
     loginAsGuest,
     logout,
+    hasRole,
+    getAllRoles,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

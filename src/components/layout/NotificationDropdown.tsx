@@ -7,7 +7,7 @@ import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 
 export const NotificationDropdown: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { userProfile, getAllRoles } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -16,11 +16,12 @@ export const NotificationDropdown: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (userProfile?.role) {
+    const userRoles = getAllRoles();
+    if (userRoles.length > 0) {
       fetchNotifications();
       fetchUnreadCount();
     }
-  }, [userProfile?.role]);
+  }, [userProfile]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -34,11 +35,12 @@ export const NotificationDropdown: React.FC = () => {
   }, []);
 
   const fetchNotifications = async () => {
-    if (!userProfile?.role) return;
+    const userRoles = getAllRoles();
+    if (userRoles.length === 0) return;
     
     setLoading(true);
     try {
-      const userNotifications = await getNotificationsForUser(userProfile.role);
+      const userNotifications = await getNotificationsForUser(userRoles);
       setNotifications(userNotifications);
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -48,10 +50,11 @@ export const NotificationDropdown: React.FC = () => {
   };
 
   const fetchUnreadCount = async () => {
-    if (!userProfile?.role) return;
+    const userRoles = getAllRoles();
+    if (userRoles.length === 0) return;
     
     try {
-      const count = await getNotificationCount(userProfile.role);
+      const count = await getNotificationCount(userRoles);
       setUnreadCount(count);
     } catch (error) {
       console.error('Error fetching notification count:', error);

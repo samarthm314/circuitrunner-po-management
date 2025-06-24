@@ -8,7 +8,7 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 
 export const Header: React.FC = () => {
-  const { userProfile, isGuest, logout } = useAuth();
+  const { userProfile, isGuest, logout, getAllRoles } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -21,6 +21,11 @@ export const Header: React.FC = () => {
       console.error('Error signing out:', error);
     }
   };
+
+  const userRoles = getAllRoles();
+  const displayRoles = userRoles.length > 1 
+    ? `${userRoles.length} roles` 
+    : userRoles[0]?.charAt(0).toUpperCase() + userRoles[0]?.slice(1);
 
   return (
     <header className="bg-gray-800 shadow-sm border-b border-gray-700 relative z-40">
@@ -55,9 +60,20 @@ export const Header: React.FC = () => {
                 <User className="h-5 w-5 text-gray-400" />
                 <div className="text-sm">
                   <p className="font-medium text-gray-100">{userProfile?.displayName}</p>
-                  <p className="text-gray-400 capitalize">
-                    {isGuest ? 'Guest (Read-Only)' : userProfile?.role}
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <p className="text-gray-400 capitalize">
+                      {isGuest ? 'Guest (Read-Only)' : displayRoles}
+                    </p>
+                    {userRoles.length > 1 && !isGuest && (
+                      <div className="flex space-x-1">
+                        {userRoles.map(role => (
+                          <Badge key={role} variant="info" size="sm">
+                            {role.charAt(0).toUpperCase()}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
