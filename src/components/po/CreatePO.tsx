@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, ExternalLink, Save, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Save, RefreshCw, MessageSquare } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -28,6 +28,7 @@ export const CreatePO: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingPOId, setEditingPOId] = useState<string | null>(null);
   const [originalPOStatus, setOriginalPOStatus] = useState<string | null>(null);
+  const [originalAdminComments, setOriginalAdminComments] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', notes: '', totalPrice: 0 }
   ]);
@@ -71,6 +72,7 @@ export const CreatePO: React.FC = () => {
         setIsEditing(true);
         setEditingPOId(poId);
         setOriginalPOStatus(po.status);
+        setOriginalAdminComments(po.adminComments || null);
         setPOName(po.name || '');
         setSelectedSubOrg(po.subOrgId);
         setSpecialRequest(po.specialRequest || '');
@@ -474,12 +476,26 @@ export const CreatePO: React.FC = () => {
             <div className="flex-shrink-0 mt-1">
               <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-red-300 font-medium mb-2">This PO was previously declined</h3>
               <p className="text-red-200 text-sm mb-3">
-                Please review the admin comments and make necessary changes before resubmitting.
+                Please review the admin comments below and make necessary changes before resubmitting.
                 Once you resubmit, it will go back to the admin for review.
               </p>
+              
+              {/* Show the actual decline reason */}
+              {originalAdminComments && (
+                <div className="bg-red-800/50 border border-red-600 rounded p-4 mb-3">
+                  <div className="flex items-start space-x-2">
+                    <MessageSquare className="h-4 w-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-red-200 text-sm font-medium mb-1">Admin Comments (Reason for Decline):</p>
+                      <p className="text-red-100 text-sm leading-relaxed">{originalAdminComments}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="bg-red-800/50 border border-red-600 rounded p-3">
                 <p className="text-red-200 text-sm font-medium">
                   💡 Tip: Address all concerns mentioned in the admin comments to improve approval chances.
