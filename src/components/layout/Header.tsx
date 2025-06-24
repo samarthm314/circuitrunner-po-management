@@ -37,7 +37,7 @@ export const Header: React.FC = () => {
               CircuitRunners Finances
             </h1>
             {isGuest && (
-              <div className="ml-10">
+              <div className="ml-6">
                 <Badge variant="info" size="sm">
                   <Eye className="h-3 w-3 mr-1" />
                   Guest Mode
