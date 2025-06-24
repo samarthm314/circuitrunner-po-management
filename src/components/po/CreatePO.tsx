@@ -585,7 +585,7 @@ export const CreatePO: React.FC = () => {
                 {/* Grid layout for form fields - responsive */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 pb-8">
                   <div className="lg:col-span-2">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Vendor</label> <span className="text-red-400">*</span>
                     <input
                       type="text"
                       value={item.vendor}
