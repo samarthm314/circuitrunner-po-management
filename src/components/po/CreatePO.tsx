@@ -615,7 +615,7 @@ export const CreatePO: React.FC = () => {
                   </div>
                   <div className="sm:col-span-2 lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
-                    <div className="flex">
+                    <div className="flex relative z-20">
                       <input
                         type="url"
                         value={item.link}
@@ -628,7 +628,7 @@ export const CreatePO: React.FC = () => {
                           href={item.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-4 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center"
+                          className="px-4 py-1 bg-gray-600 border border-l-0 border-gray-500 rounded-r hover:bg-gray-500 flex items-center justify-center relative z-30"
                           title="Open link"
                         >
                           <ExternalLink className="h-4 w-4 text-gray-300" />
@@ -642,7 +642,7 @@ export const CreatePO: React.FC = () => {
                       type="text"
                       value={item.notes || ''}
                       onChange={(e) => updateLineItem(item.id, 'notes', e.target.value)}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400 relative z-10"
                       placeholder="Additional notes or specifications..."
                     />
                   </div>
