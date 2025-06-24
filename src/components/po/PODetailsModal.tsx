@@ -293,16 +293,16 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Approval and Purchase Info */}
+          {/* Approval and Purchase Tracking - Always show if data exists */}
           {(po.approvedByName || po.purchasedByName) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {po.approvedByName && (
                 <div className="bg-green-900/30 border border-green-700 p-4 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <CheckCircle className="h-5 w-5 text-green-400" />
                     <h3 className="font-medium text-green-300">Approved By</h3>
                   </div>
-                  <p className="text-green-200">{po.approvedByName}</p>
+                  <p className="text-green-200 font-medium">{po.approvedByName}</p>
                   {po.approvedAt && (
                     <p className="text-green-300 text-sm mt-1">
                       {format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy HH:mm')}
@@ -314,10 +314,10 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
               {po.purchasedByName && (
                 <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
                   <div className="flex items-center space-x-2 mb-2">
-                    <ShoppingCart className="h-4 w-4 text-blue-400" />
+                    <ShoppingCart className="h-5 w-5 text-blue-400" />
                     <h3 className="font-medium text-blue-300">Purchased By</h3>
                   </div>
-                  <p className="text-blue-200">{po.purchasedByName}</p>
+                  <p className="text-blue-200 font-medium">{po.purchasedByName}</p>
                   {po.purchasedAt && (
                     <p className="text-blue-300 text-sm mt-1">
                       {format(new Date(po.purchasedAt.seconds * 1000), 'MMM dd, yyyy HH:mm')}
