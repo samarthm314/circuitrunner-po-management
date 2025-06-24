@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { User as FirebaseUser, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { User } from '../types';
@@ -10,7 +10,7 @@ interface AuthContextType {
   loading: boolean;
   isGuest: boolean;
   loginAsGuest: () => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
   getAllRoles: () => string[];
 }
@@ -21,7 +21,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isGuest: false,
   loginAsGuest: () => {},
-  logout: () => {},
+  logout: async () => {},
   hasRole: () => false,
   getAllRoles: () => [],
 });
@@ -135,18 +135,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(false);
   };
 
-  const logout = () => {
-    // Clear all state
-    setIsGuest(false);
-    setCurrentUser(null);
-    setUserProfile(null);
-    
-    // Clear any stored authentication data
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    // Force reload to ensure clean state
-    window.location.reload();
+  const logout = async () => {
+    try {
+      // If there's a current user, sign them out from Firebase
+      if (currentUser) {
+        await signOut(auth);
+      }
+      
+      // Clear all state
+      setIsGuest(false);
+      setCurrentUser(null);
+      setUserProfile(null);
+      
+      // Clear any stored authentication data
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      
+      // Even if there's an error, clear local state
+      setIsGuest(false);
+      setCurrentUser(null);
+      setUserProfile(null);
+      localStorage.clear();
+      sessionStorage.clear();
+    }
   };
 
   const value = {

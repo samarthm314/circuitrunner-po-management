@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { AlertModal } from '../ui/Modal';
 import { NotificationDropdown } from './NotificationDropdown';
-import { signOut, linkWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { linkWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../../config/firebase';
 import { useModal } from '../../hooks/useModal';
 
@@ -18,21 +18,11 @@ export const Header: React.FC = () => {
   const handleSignOut = async () => {
     setSigningOut(true);
     try {
-      if (isGuest) {
-        // Handle guest logout
-        logout();
-      } else {
-        // For authenticated users (both email/password and Google)
-        // First sign out from Firebase Auth
-        await signOut(auth);
-        
-        // Clear any local storage or session data
-        localStorage.clear();
-        sessionStorage.clear();
-        
-        // Force a page reload to clear any cached authentication state
-        window.location.reload();
-      }
+      // Always call the centralized logout function
+      await logout();
+      
+      // Force a page reload to ensure complete state reset
+      window.location.reload();
     } catch (error) {
       console.error('Error signing out:', error);
       
