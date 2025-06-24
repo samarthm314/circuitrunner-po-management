@@ -16,7 +16,10 @@ import {
   EyeOff,
   Plus,
   Mail,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Search,
+  Filter,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
@@ -37,15 +40,57 @@ export const UserManagement: React.FC = () => {
   const { userProfile, hasRole } = useAuth();
   const { alertModal, showAlert, closeAlert } = useModal();
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<User>>({});
   const [sendingResetEmail, setSendingResetEmail] = useState<string | null>(null);
+  
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  const availableRoles = ['guest', 'director', 'admin', 'purchaser'];
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    // Apply search and role filters
+    let filtered = users;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(user => 
+        user.displayName.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        user.id.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply role filter
+    if (selectedRoles.length > 0) {
+      filtered = filtered.filter(user => {
+        const userRoles = [user.role];
+        if (user.roles) {
+          user.roles.forEach(role => {
+            if (!userRoles.includes(role)) {
+              userRoles.push(role);
+            }
+          });
+        }
+        
+        // Check if user has ALL selected roles (AND logic)
+        return selectedRoles.every(selectedRole => userRoles.includes(selectedRole));
+      });
+    }
+
+    setFilteredUsers(filtered);
+  }, [users, searchTerm, selectedRoles]);
 
   const fetchUsers = async () => {
     try {
@@ -400,6 +445,26 @@ export const UserManagement: React.FC = () => {
     setEditData({ ...editData, roles: newRoles });
   };
 
+  const toggleRoleFilter = (role: string) => {
+    setSelectedRoles(prev => 
+      prev.includes(role)
+        ? prev.filter(r => r !== role)
+        : [...prev, role]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedRoles([]);
+  };
+
+  const getMultiRoleUsers = () => {
+    return users.filter(user => {
+      const totalRoles = user.roles ? user.roles.length + 1 : 1; // +1 for primary role
+      return totalRoles > 1;
+    });
+  };
+
   if (!hasRole('admin')) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -418,6 +483,8 @@ export const UserManagement: React.FC = () => {
       </div>
     );
   }
+
+  const multiRoleUsers = getMultiRoleUsers();
 
   return (
     <div className="space-y-6">
@@ -451,6 +518,117 @@ export const UserManagement: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Search and Filter Section */}
+      <Card>
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or user ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+                />
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filters
+                {selectedRoles.length > 0 && (
+                  <Badge variant="info" size="sm" className="ml-2">
+                    {selectedRoles.length}
+                  </Badge>
+                )}
+              </Button>
+              {(searchTerm || selectedRoles.length > 0) && (
+                <Button variant="ghost" onClick={clearFilters}>
+                  Clear All
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="border-t border-gray-700 pt-4">
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-200 mb-2">Filter by Roles (Users must have ALL selected roles)</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {availableRoles.map(role => (
+                      <button
+                        key={role}
+                        onClick={() => toggleRoleFilter(role)}
+                        className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
+                          selectedRoles.includes(role)
+                            ? 'bg-green-600 border-green-500 text-white'
+                            : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Filter Buttons */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-200 mb-2">Quick Filters</h4>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRoles(['director', 'admin'])}
+                    >
+                      <UserCheck className="h-3 w-3 mr-1" />
+                      Director + Admin
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRoles(['admin', 'purchaser'])}
+                    >
+                      <UserCheck className="h-3 w-3 mr-1" />
+                      Admin + Purchaser
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedRoles(['guest'])}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      Guest Users Only
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Results Summary */}
+          <div className="flex justify-between items-center text-sm text-gray-400 border-t border-gray-700 pt-4">
+            <div>
+              Showing {filteredUsers.length} of {users.length} users
+              {searchTerm && ` (search: "${searchTerm}")`}
+              {selectedRoles.length > 0 && ` (roles: ${selectedRoles.join(', ')})`}
+            </div>
+            <div className="flex items-center space-x-4">
+              <span>Multi-role users: {multiRoleUsers.length}</span>
+              <span>Total users: {users.length}</span>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* Instructions */}
       <Card>
@@ -511,8 +689,13 @@ export const UserManagement: React.FC = () => {
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center">
               <Users className="h-5 w-5 mr-2" />
-              Users ({users.length})
+              Users ({filteredUsers.length})
             </CardTitle>
+            {filteredUsers.length !== users.length && (
+              <Badge variant="info" size="md">
+                Filtered Results
+              </Badge>
+            )}
           </div>
         </CardHeader>
         
@@ -529,7 +712,7 @@ export const UserManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => {
+              {filteredUsers.map((user) => {
                 const isEditing = editingId === user.id;
 
                 return (
@@ -649,11 +832,18 @@ export const UserManagement: React.FC = () => {
           </table>
         </div>
 
-        {users.length === 0 && (
+        {filteredUsers.length === 0 && (
           <div className="text-center py-12">
             <UserPlus className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400 text-lg">No users found</p>
-            <p className="text-gray-500 mt-2">Import users from a JSON file to get started</p>
+            <p className="text-gray-400 text-lg">
+              {searchTerm || selectedRoles.length > 0 ? 'No users match your search criteria' : 'No users found'}
+            </p>
+            <p className="text-gray-500 mt-2">
+              {searchTerm || selectedRoles.length > 0 
+                ? 'Try adjusting your search terms or filters' 
+                : 'Import users from a JSON file to get started'
+              }
+            </p>
           </div>
         )}
       </Card>
