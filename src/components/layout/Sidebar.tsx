@@ -8,7 +8,8 @@ import {
   Settings, 
   CreditCard,
   Archive,
-  Eye
+  Eye,
+  Heart
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -39,8 +40,8 @@ export const Sidebar: React.FC = () => {
   );
 
   return (
-    <div className="w-64 bg-gray-800 border-r border-gray-700 h-full">
-      <nav className="mt-8 px-4">
+    <div className="w-64 bg-gray-800 border-r border-gray-700 h-full flex flex-col">
+      <nav className="mt-8 px-4 flex-1">
         {isGuest && (
           <div className="mb-6 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
             <div className="flex items-center text-blue-300 mb-2">
@@ -74,6 +75,15 @@ export const Sidebar: React.FC = () => {
           })}
         </ul>
       </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-6 border-t border-gray-700">
+        <div className="flex items-center justify-center text-xs text-gray-500">
+          <span>Made with</span>
+          <Heart className="h-3 w-3 mx-1 text-red-500 fill-current" />
+          <span>by Samarth Mahapatra</span>
+        </div>
+      </div>
     </div>
   );
 };
