@@ -79,23 +79,31 @@ export const UserManagement: React.FC = () => {
         throw new Error('JSON file must contain an array of user objects');
       }
 
+      const validRoles = ['director', 'admin', 'purchaser'];
+
       // Validate the data structure
-      for (const user of userData) {
+      for (let i = 0; i < userData.length; i++) {
+        const user = userData[i];
+        const userIndex = `User ${i + 1} (${user.email || 'unknown email'})`;
+
         if (!user.email || !user.password || !user.displayName || !user.role) {
-          throw new Error('Each user must have email, password, displayName, and role');
+          throw new Error(`${userIndex}: Each user must have email, password, displayName, and role`);
         }
-        if (!['director', 'admin', 'purchaser'].includes(user.role)) {
-          throw new Error('Role must be one of: director, admin, purchaser');
+
+        if (!validRoles.includes(user.role)) {
+          throw new Error(`${userIndex}: Primary role "${user.role}" is invalid. Role must be one of: ${validRoles.join(', ')}`);
         }
+
         if (user.roles) {
           for (const role of user.roles) {
-            if (!['director', 'admin', 'purchaser'].includes(role)) {
-              throw new Error('Additional roles must be one of: director, admin, purchaser');
+            if (!validRoles.includes(role)) {
+              throw new Error(`${userIndex}: Additional role "${role}" is invalid. Roles must be one of: ${validRoles.join(', ')}`);
             }
           }
         }
+
         if (!user.email.endsWith('@circuitrunners.com')) {
-          throw new Error('All emails must end with @circuitrunners.com');
+          throw new Error(`${userIndex}: Email must end with @circuitrunners.com`);
         }
       }
 
@@ -390,6 +398,9 @@ export const UserManagement: React.FC = () => {
           </ul>
           <p className="text-yellow-300">
             <strong>Note:</strong> Users with multiple roles will have access to all features of their assigned roles.
+          </p>
+          <p className="text-red-300">
+            <strong>Important:</strong> Only "director", "admin", and "purchaser" roles are supported. Guest users cannot be imported through this system.
           </p>
         </div>
       </Card>
