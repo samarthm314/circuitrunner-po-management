@@ -898,11 +898,18 @@ export const CreatePO: React.FC = () => {
                   <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price<span className="text-red-400">*</span></label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
-                      value={item.unitPrice || ''}
-                      onChange={(e) => updateLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      value={item.unitPrice === 0 ? '' : item.unitPrice.toString()}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty string, numbers, and decimal point
+                        if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                          updateLineItem(item.id, 'unitPrice', value === '' ? 0 : parseFloat(value) || 0);
+                        }
+                      }}
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
                     />
