@@ -951,12 +951,10 @@ export const CreatePO: React.FC = () => {
                     <input
                       type="text"
                       inputMode="decimal"
-                      min="0"
-                      step="0.01"
                       value={item.unitPrice === 0 ? '' : item.unitPrice.toString()}
                       onChange={(e) => {
                         const value = e.target.value;
-                        // Allow empty string, numbers, and decimal point
+                        // Allow empty string, numbers with optional decimal point and digits after
                         if (value === '' || /^\d*\.?\d*$/.test(value)) {
                           updateLineItem(item.id, 'unitPrice', value === '' ? 0 : parseFloat(value) || 0);
                         }
