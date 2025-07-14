@@ -878,25 +878,6 @@ export const CreatePO: React.FC = () => {
                   <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">SKU (Optional)</label>
                     <input
-                      type="text"
-                      value={item.sku || ''}
-                      onChange={(e) => updateLineItem(item.id, 'sku', e.target.value)}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                      placeholder="SKU/Part #"
-                    />
-                  </div>
-                  <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Qty<span className="text-red-400">*</span></label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                    />
-                  </div>
-                  <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price<span className="text-red-400">*</span></label>
                     <input
                       type="text"
                       inputMode="decimal"
