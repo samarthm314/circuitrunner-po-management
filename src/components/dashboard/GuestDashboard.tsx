@@ -344,6 +344,8 @@ export const GuestDashboard: React.FC = () => {
                       <p className="text-xs text-gray-400">
                         {transaction.postDate.toLocaleDateString()}
                         {transaction.notes && ` • ${transaction.notes}`}
+                      </p>
+                    </div>
                     {transaction.allocations && transaction.allocations.length > 0 ? (
                       transaction.allocations.length === 1 ? (
                         <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
