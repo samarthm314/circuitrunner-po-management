@@ -954,14 +954,8 @@ export const CreatePO: React.FC = () => {
                       value={item.unitPrice === 0 ? '' : item.unitPrice.toString()}
                       onChange={(e) => {
                         const value = e.target.value;
-                        // Only prevent non-numeric characters except decimal point
-                        if (value === '' || /^[\d.]*$/.test(value)) {
-                          // Prevent multiple decimal points
-                          const decimalCount = (value.match(/\./g) || []).length;
-                          if (decimalCount <= 1) {
-                            updateLineItem(item.id, 'unitPrice', value === '' ? 0 : parseFloat(value) || 0);
-                          }
-                        }
+                        // Allow any input, convert to number on blur or when valid
+                        updateLineItem(item.id, 'unitPrice', value === '' ? 0 : parseFloat(value) || 0);
                       }}
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
