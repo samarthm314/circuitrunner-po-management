@@ -848,25 +848,111 @@ export const Transactions: React.FC = () => {
                     </td>
                     <td className="py-4 px-4">
                       {isEditing ? (
-                        <select
-                          value={editData.subOrgId || ''}
-                          onChange={(e) => setEditData({ ...editData, subOrgId: e.target.value })}
-                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                          disabled={savingEdit}
-                        >
-                          <option value="" className="text-gray-100 bg-gray-700">Select organization</option>
-                          {subOrgs.map(org => (
-                            <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                              {org.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-gray-300">
-                          {transaction.subOrgName || (
-                            <Badge variant="warning" size="sm">Unallocated</Badge>
+                        <div className="space-y-2">
+                          {/* Split Mode Toggle */}
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant={isSplitMode[transaction.id] ? "primary" : "outline"}
+                              size="sm"
+                              onClick={() => toggleSplitMode(transaction.id)}
+                              disabled={savingEdit}
+                            >
+                              <Split className="h-3 w-3 mr-1" />
+                              {isSplitMode[transaction.id] ? 'Split Mode' : 'Single Mode'}
+                            </Button>
+                            {isSplitMode[transaction.id] && (
+                              <span className="text-xs text-gray-400">
+                                Total: ${editAllocations.reduce((sum, a) => sum + a.amount, 0).toFixed(2)} / ${transaction.debitAmount.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Single Mode */}
+                          {!isSplitMode[transaction.id] && (
+                            <select
+                              value={editData.subOrgId || ''}
+                              onChange={(e) => setEditData({ ...editData, subOrgId: e.target.value })}
+                              className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                              disabled={savingEdit}
+                            >
+                              <option value="" className="text-gray-100 bg-gray-700">Select organization</option>
+                              {subOrgs.map(org => (
+                                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                                  {org.name}
+                                </option>
+                              ))}
+                            </select>
                           )}
-                        </span>
+
+                          {/* Split Mode */}
+                          {isSplitMode[transaction.id] && (
+                            <div className="space-y-2">
+                              {editAllocations.map((allocation, index) => (
+                                <div key={allocation.id} className="flex items-center space-x-2 p-2 bg-gray-700 rounded">
+                                  <select
+                                    value={allocation.subOrgId}
+                                    onChange={(e) => updateAllocation(allocation.id, 'subOrgId', e.target.value)}
+                                    className="flex-1 px-2 py-1 text-xs bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                                    disabled={savingEdit}
+                                  >
+                                    <option value="">Select org</option>
+                                    {subOrgs.map(org => (
+                                      <option key={org.id} value={org.id}>
+                                        {org.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <input
+                                    type="number"
+                                    value={allocation.amount}
+                                    onChange={(e) => updateAllocation(allocation.id, 'amount', parseFloat(e.target.value) || 0)}
+                                    className="w-20 px-2 py-1 text-xs bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                                    placeholder="Amount"
+                                    min="0"
+                                    max={transaction.debitAmount}
+                                    step="0.01"
+                                    disabled={savingEdit}
+                                  />
+                                  <span className="text-xs text-gray-400 w-12">
+                                    {allocation.percentage.toFixed(0)}%
+                                  </span>
+                                  {editAllocations.length > 1 && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeAllocation(allocation.id)}
+                                      disabled={savingEdit}
+                                      className="p-1 text-red-400 hover:text-red-300"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                              
+                              {/* Add Allocation Button */}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addAllocation(transaction.id)}
+                                disabled={savingEdit || editAllocations.reduce((sum, a) => sum + a.amount, 0) >= transaction.debitAmount}
+                                className="w-full"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Allocation
+                              </Button>
+                              
+                              {/* Validation Message */}
+                              {editAllocations.reduce((sum, a) => sum + a.amount, 0) > transaction.debitAmount && (
+                                <div className="text-xs text-red-400">
+                                  Total allocations exceed transaction amount!
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        getTransactionAllocationDisplay(transaction)
                       )}
                     </td>
                     <td className="py-4 px-4">
