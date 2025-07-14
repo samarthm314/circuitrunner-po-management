@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -7,60 +6,53 @@ import { ConfirmModal, AlertModal } from '../ui/Modal';
 import { 
   Upload, 
   Download, 
-  Trash2, 
-  Edit, 
-  Save, 
-  X, 
   FileText,
   DollarSign,
   Calendar,
   Building,
-  Link,
   Search,
   Eye,
-  Split,
+  Trash2,
+  Edit,
+  Save,
+  X,
   Plus,
-  Minus
+  Link as LinkIcon
 } from 'lucide-react';
-import { Transaction, SubOrganization, PurchaseOrder, TransactionAllocation } from '../../types';
+import { Transaction, SubOrganization, PurchaseOrder } from '../../types';
 import { 
   getAllTransactions, 
+  createTransaction, 
   updateTransaction, 
-  deleteTransaction, 
-  uploadReceiptFile, 
-  deleteReceiptFile,
+  deleteTransaction,
   processExcelData,
+  uploadReceiptFile,
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
-import { getPOsByStatus, getPOById } from '../../services/poService';
-import { useAuth } from '../../contexts/AuthContext';
+import { getAllPOs, getPOById } from '../../services/poService';
 import { PODetailsModal } from '../po/PODetailsModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { GuestTransactions } from './GuestTransactions';
 import { useModal } from '../../hooks/useModal';
 import * as XLSX from 'xlsx';
 
 export const Transactions: React.FC = () => {
-  const { userProfile, isGuest } = useAuth();
+  const { isGuest, hasRole } = useAuth();
   const { confirmModal, alertModal, showConfirm, showAlert, closeConfirm, closeAlert, setConfirmLoading } = useModal();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [subOrgs, setSubOrgs] = useState<SubOrganization[]>([]);
-  const [purchasedPOs, setPurchasedPOs] = useState<PurchaseOrder[]>([]);
+  const [pos, setPOs] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [subOrgFilter, setSubOrgFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Transaction>>({});
-  const [editAllocations, setEditAllocations] = useState<TransactionAllocation[]>([]);
-  const [isSplitMode, setIsSplitMode] = useState<{ [key: string]: boolean }>({});
-  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
-  const [processingExcel, setProcessingExcel] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [subOrgFilter, setSubOrgFilter] = useState<string>('all');
-  
-  // PO Selection Modal State
-  const [showPOModal, setShowPOModal] = useState<string | null>(null);
-  const [poSearchTerm, setPOSearchTerm] = useState('');
-  const [linkingPO, setLinkingPO] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState<string | null>(null);
+  const [splitAllocations, setSplitAllocations] = useState<{ subOrgId: string; amount: number }[]>([]);
 
   // PO Details Modal State
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -77,38 +69,253 @@ export const Transactions: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Apply sub-organization filter
+    // Apply filters
     let filtered = transactions;
 
     if (subOrgFilter !== 'all') {
       if (subOrgFilter === 'unallocated') {
+        // Only truly unallocated transactions (no subOrgId and no allocations)
         filtered = filtered.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0));
       } else {
-        filtered = filtered.filter(t => 
-          t.subOrgId === subOrgFilter || 
-          (t.allocations && t.allocations.some(a => a.subOrgId === subOrgFilter))
-        );
+        // Include transactions where the org is either the primary allocation or part of a split
+        filtered = filtered.filter(t => {
+          // Check legacy single allocation
+          if (t.subOrgId === subOrgFilter) return true;
+          
+          // Check split allocations
+          if (t.allocations && t.allocations.length > 0) {
+            return t.allocations.some(allocation => allocation.subOrgId === subOrgFilter);
+          }
+          
+          return false;
+        });
       }
     }
 
+    if (searchTerm) {
+      filtered = filtered.filter(t => 
+        t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (t.notes && t.notes.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (t.subOrgName && t.subOrgName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (t.allocations && t.allocations.some(alloc => 
+          alloc.subOrgName.toLowerCase().includes(searchTerm.toLowerCase())
+        ))
+      );
+    }
+
     setFilteredTransactions(filtered);
-  }, [transactions, subOrgFilter]);
+  }, [transactions, subOrgFilter, searchTerm]);
 
   const fetchData = async () => {
     try {
-      const [transactionsData, subOrgsData, purchasedPOsData] = await Promise.all([
+      const [transactionsData, subOrgsData, posData] = await Promise.all([
         getAllTransactions(),
         getSubOrganizations(),
-        getPOsByStatus('purchased')
+        getAllPOs()
       ]);
       setTransactions(transactionsData);
       setFilteredTransactions(transactionsData);
       setSubOrgs(subOrgsData);
-      setPurchasedPOs(purchasedPOsData);
+      setPOs(posData);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      // Convert to objects with proper headers
+      const headers = jsonData[0] as string[];
+      const rows = jsonData.slice(1) as any[][];
+      
+      const processedData = rows.map(row => {
+        const obj: any = {};
+        headers.forEach((header, index) => {
+          const normalizedHeader = header.toLowerCase().replace(/\s+/g, '');
+          obj[normalizedHeader] = row[index];
+        });
+        return obj;
+      });
+
+      const result = await processExcelData(processedData);
+      
+      await fetchData(); // Refresh data
+      
+      await showAlert({
+        title: 'Import Complete',
+        message: `Successfully processed ${result.processed} transactions. ${result.skipped} skipped. ${result.errors.length} errors.`,
+        variant: result.processed > 0 ? 'success' : 'warning'
+      });
+
+    } catch (error) {
+      console.error('Error processing file:', error);
+      await showAlert({
+        title: 'Import Error',
+        message: 'Error processing file. Please check the format and try again.',
+        variant: 'error'
+      });
+    } finally {
+      setImporting(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleExport = () => {
+    setExportLoading(true);
+    try {
+      // Prepare export data with proper split handling
+      const exportData = filteredTransactions.map(transaction => {
+        const baseData = {
+          'Post Date': transaction.postDate.toLocaleDateString(),
+          'Description': transaction.description,
+          'Total Amount': transaction.debitAmount,
+          'Status': transaction.status,
+          'Notes': transaction.notes || '',
+          'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : '',
+          'Created At': transaction.createdAt.toLocaleDateString()
+        };
+
+        // Handle split allocations vs single allocation
+        if (transaction.allocations && transaction.allocations.length > 0) {
+          if (transaction.allocations.length === 1) {
+            // Single allocation from new system
+            return {
+              ...baseData,
+              'Sub-Organization': transaction.allocations[0].subOrgName,
+              'Allocated Amount': transaction.allocations[0].amount,
+              'Allocation Type': 'Single',
+              'Split Details': ''
+            };
+          } else {
+            // Multiple allocations - create summary
+            const splitDetails = transaction.allocations
+              .map(alloc => `${alloc.subOrgName}: $${alloc.amount.toFixed(2)} (${alloc.percentage.toFixed(1)}%)`)
+              .join('; ');
+            
+            return {
+              ...baseData,
+              'Sub-Organization': `Split (${transaction.allocations.length} orgs)`,
+              'Allocated Amount': transaction.debitAmount, // Total amount
+              'Allocation Type': 'Split',
+              'Split Details': splitDetails
+            };
+          }
+        } else if (transaction.subOrgName) {
+          // Legacy single allocation
+          return {
+            ...baseData,
+            'Sub-Organization': transaction.subOrgName,
+            'Allocated Amount': transaction.debitAmount,
+            'Allocation Type': 'Legacy Single',
+            'Split Details': ''
+          };
+        } else {
+          // Unallocated
+          return {
+            ...baseData,
+            'Sub-Organization': 'Unallocated',
+            'Allocated Amount': 0,
+            'Allocation Type': 'Unallocated',
+            'Split Details': ''
+          };
+        }
+      });
+
+      // Create workbook with multiple sheets
+      const wb = XLSX.utils.book_new();
+
+      // Main transactions sheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Set column widths
+      ws['!cols'] = [
+        { wch: 12 }, // Post Date
+        { wch: 40 }, // Description
+        { wch: 12 }, // Total Amount
+        { wch: 10 }, // Status
+        { wch: 30 }, // Notes
+        { wch: 25 }, // Sub-Organization
+        { wch: 15 }, // Allocated Amount
+        { wch: 15 }, // Allocation Type
+        { wch: 60 }, // Split Details
+        { wch: 15 }, // Linked PO
+        { wch: 12 }  // Created At
+      ];
+      
+      XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+
+      // Create split details sheet for complex splits
+      const splitTransactions = filteredTransactions.filter(t => 
+        t.allocations && t.allocations.length > 1
+      );
+
+      if (splitTransactions.length > 0) {
+        const splitData: any[] = [];
+        
+        splitTransactions.forEach(transaction => {
+          transaction.allocations!.forEach((allocation, index) => {
+            splitData.push({
+              'Transaction Date': transaction.postDate.toLocaleDateString(),
+              'Transaction Description': transaction.description,
+              'Total Transaction Amount': transaction.debitAmount,
+              'Split #': index + 1,
+              'Organization': allocation.subOrgName,
+              'Allocated Amount': allocation.amount,
+              'Percentage': `${allocation.percentage.toFixed(1)}%`,
+              'Notes': transaction.notes || ''
+            });
+          });
+        });
+
+        const splitWs = XLSX.utils.json_to_sheet(splitData);
+        splitWs['!cols'] = [
+          { wch: 15 }, // Transaction Date
+          { wch: 40 }, // Transaction Description
+          { wch: 20 }, // Total Transaction Amount
+          { wch: 8 },  // Split #
+          { wch: 25 }, // Organization
+          { wch: 15 }, // Allocated Amount
+          { wch: 12 }, // Percentage
+          { wch: 30 }  // Notes
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, splitWs, 'Split Details');
+      }
+
+      // Generate filename with current date and filter info
+      const date = new Date().toISOString().split('T')[0];
+      const filterSuffix = subOrgFilter !== 'all' ? `_${subOrgFilter === 'unallocated' ? 'unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name?.replace(/\s+/g, '_') || 'filtered'}` : '';
+      const filename = `transactions_export${filterSuffix}_${date}.xlsx`;
+
+      // Save file
+      XLSX.writeFile(wb, filename);
+
+      showAlert({
+        title: 'Export Successful',
+        message: `Transactions exported successfully as "${filename}". ${splitTransactions.length > 0 ? 'Split transaction details are included in a separate sheet.' : ''}`,
+        variant: 'success'
+      });
+
+    } catch (error) {
+      console.error('Error exporting transactions:', error);
+      showAlert({
+        title: 'Export Error',
+        message: 'Error exporting transactions. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -143,301 +350,31 @@ export const Transactions: React.FC = () => {
     setSelectedPO(null);
   };
 
-  const triggerFileUpload = () => {
-    const fileInput = document.getElementById('excel-upload') as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
-    }
-  };
-
-  const triggerReceiptUpload = (transactionId: string) => {
-    const fileInput = document.getElementById(`receipt-upload-${transactionId}`) as HTMLInputElement;
-    if (fileInput) {
-      fileInput.click();
-    }
-  };
-
-  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setProcessingExcel(true);
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { cellDates: true }); // Enable automatic date parsing
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1,
-        raw: false, // This helps with date formatting
-        dateNF: 'mm/dd/yyyy' // Specify date format
-      });
-      
-      // Convert to objects with proper headers
-      const headers = jsonData[0] as string[];
-      const rows = jsonData.slice(1).map(row => {
-        const obj: any = {};
-        headers.forEach((header, index) => {
-          const key = header.toLowerCase().replace(/\s+/g, '');
-          obj[key] = (row as any[])[index];
-        });
-        return obj;
-      });
-
-      console.log('Sample row for debugging:', rows[0]);
-
-      const result = await processExcelData(rows);
-      
-      await showAlert({
-        title: 'Excel Processing Complete',
-        message: `Excel processed successfully!\nProcessed: ${result.processed}\nSkipped: ${result.skipped}\nErrors: ${result.errors.length}`,
-        variant: 'success'
-      });
-      
-      if (result.errors.length > 0) {
-        console.error('Processing errors:', result.errors);
-      }
-
-      await fetchData(); // Refresh data
-    } catch (error) {
-      console.error('Error processing Excel:', error);
-      await showAlert({
-        title: 'Error',
-        message: 'Error processing Excel file. Please check the format.',
-        variant: 'error'
-      });
-    } finally {
-      setProcessingExcel(false);
-      event.target.value = ''; // Reset file input
-    }
-  };
-
-  const handleExport = () => {
-    try {
-      // Use filtered transactions for export
-      const exportData = filteredTransactions.map(transaction => ({
-        'Post Date': transaction.postDate.toLocaleDateString(),
-        'Description': transaction.description,
-        'Amount': transaction.debitAmount,
-        'Sub-Organization': transaction.subOrgName || 'Unallocated',
-        'Status': transaction.status,
-        'Notes': transaction.notes || '',
-        'Receipt': transaction.receiptUrl ? 'Yes' : 'No',
-        'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : 'None',
-        'Created At': transaction.createdAt.toLocaleDateString()
-      }));
-
-      // Create workbook and worksheet
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
-
-      // Add worksheet to workbook
-      XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
-
-      // Generate filename with current date and filter info
-      const date = new Date().toISOString().split('T')[0];
-      const filterSuffix = subOrgFilter !== 'all' ? `_${subOrgFilter === 'unallocated' ? 'unallocated' : subOrgs.find(org => org.id === subOrgFilter)?.name?.replace(/\s+/g, '_') || 'filtered'}` : '';
-      const filename = `transactions_export${filterSuffix}_${date}.xlsx`;
-
-      // Save file
-      XLSX.writeFile(wb, filename);
-    } catch (error) {
-      console.error('Error exporting transactions:', error);
-      showAlert({
-        title: 'Error',
-        message: 'Error exporting transactions. Please try again.',
-        variant: 'error'
-      });
-    }
-  };
-
   const startEdit = (transaction: Transaction) => {
     setEditingId(transaction.id);
-    
-    // Initialize allocations for split mode
-    if (transaction.allocations && transaction.allocations.length > 0) {
-      setEditAllocations([...transaction.allocations]);
-      setIsSplitMode(prev => ({ ...prev, [transaction.id]: true }));
-    } else if (transaction.subOrgId) {
-      // Convert single allocation to split format
-      setEditAllocations([{
-        id: '1',
-        subOrgId: transaction.subOrgId,
-        subOrgName: transaction.subOrgName || '',
-        amount: transaction.debitAmount,
-        percentage: 100
-      }]);
-      setIsSplitMode(prev => ({ ...prev, [transaction.id]: false }));
-    } else {
-      // Unallocated transaction
-      setEditAllocations([]);
-      setIsSplitMode(prev => ({ ...prev, [transaction.id]: false }));
-    }
-    
     setEditData({
-      subOrgId: transaction.subOrgId,
-      subOrgName: transaction.subOrgName,
-      notes: transaction.notes || '', // Default to empty string if undefined
+      notes: transaction.notes || '',
+      linkedPOId: transaction.linkedPOId || '',
+      linkedPOName: transaction.linkedPOName || ''
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditData({});
-    setEditAllocations([]);
-    setIsSplitMode(prev => {
-      const newState = { ...prev };
-      if (editingId) {
-        delete newState[editingId];
-      }
-      return newState;
-    });
-  };
-
-  const toggleSplitMode = (transactionId: string) => {
-    const transaction = transactions.find(t => t.id === transactionId);
-    if (!transaction) return;
-    
-    const currentSplitMode = isSplitMode[transactionId];
-    
-    if (!currentSplitMode) {
-      // Switching to split mode
-      if (editAllocations.length === 0) {
-        // Start with one allocation for the full amount
-        setEditAllocations([{
-          id: '1',
-          subOrgId: '',
-          subOrgName: '',
-          amount: transaction.debitAmount,
-          percentage: 100
-        }]);
-      }
-    } else {
-      // Switching to single mode - keep only the first allocation
-      if (editAllocations.length > 0) {
-        const firstAllocation = editAllocations[0];
-        setEditData({
-          ...editData,
-          subOrgId: firstAllocation.subOrgId,
-          subOrgName: firstAllocation.subOrgName
-        });
-        setEditAllocations([firstAllocation]);
-      }
-    }
-    
-    setIsSplitMode(prev => ({ ...prev, [transactionId]: !currentSplitMode }));
-  };
-
-  const addAllocation = (transactionId: string) => {
-    const transaction = transactions.find(t => t.id === transactionId);
-    if (!transaction) return;
-    
-    const usedAmount = editAllocations.reduce((sum, a) => sum + a.amount, 0);
-    const remainingAmount = transaction.debitAmount - usedAmount;
-    
-    if (remainingAmount > 0) {
-      const newAllocation: TransactionAllocation = {
-        id: Date.now().toString(),
-        subOrgId: '',
-        subOrgName: '',
-        amount: remainingAmount,
-        percentage: (remainingAmount / transaction.debitAmount) * 100
-      };
-      
-      setEditAllocations(prev => [...prev, newAllocation]);
-    }
-  };
-
-  const removeAllocation = (allocationId: string) => {
-    setEditAllocations(prev => prev.filter(a => a.id !== allocationId));
-  };
-
-  const updateAllocation = (allocationId: string, field: keyof TransactionAllocation, value: string | number) => {
-    const transaction = transactions.find(t => t.id === editingId);
-    if (!transaction) return;
-    
-    setEditAllocations(prev => prev.map(allocation => {
-      if (allocation.id === allocationId) {
-        const updated = { ...allocation, [field]: value };
-        
-        // Update sub-org name when sub-org ID changes
-        if (field === 'subOrgId') {
-          const selectedSubOrg = subOrgs.find(org => org.id === value);
-          updated.subOrgName = selectedSubOrg?.name || '';
-        }
-        
-        // Recalculate percentage when amount changes
-        if (field === 'amount') {
-          updated.percentage = transaction.debitAmount > 0 ? ((value as number) / transaction.debitAmount) * 100 : 0;
-        }
-        
-        return updated;
-      }
-      return allocation;
-    }));
   };
 
   const saveEdit = async (transactionId: string) => {
-    setSavingEdit(true);
     try {
-      const transaction = transactions.find(t => t.id === transactionId);
-      if (!transaction) return;
-      
-      // Clean the update data to remove undefined values
-      const updateData: Partial<Transaction> = {};
-      
-      if (isSplitMode[transactionId]) {
-        // Split mode - save allocations
-        const validAllocations = editAllocations.filter(a => a.subOrgId && a.amount > 0);
-        
-        if (validAllocations.length === 0) {
-          // No valid allocations - clear everything
-          updateData.allocations = null;
-          updateData.subOrgId = null;
-          updateData.subOrgName = null;
-        } else {
-          updateData.allocations = validAllocations;
-          // Clear legacy fields when using allocations
-          updateData.subOrgId = null;
-          updateData.subOrgName = null;
-        }
-      } else {
-        // Single mode - use legacy fields
-        const selectedSubOrg = subOrgs.find(org => org.id === editData.subOrgId);
-        
-        if (editData.subOrgId !== undefined) {
-          updateData.subOrgId = editData.subOrgId || null;
-        }
-        
-        if (selectedSubOrg?.name) {
-          updateData.subOrgName = selectedSubOrg.name;
-        } else if (editData.subOrgId === '') {
-          updateData.subOrgName = null;
-        }
-        
-        // Clear allocations when using single mode
-        updateData.allocations = null;
-      }
-      
-      if (editData.notes !== undefined) {
-        updateData.notes = editData.notes;
-      }
-
-      // Update transaction (this will automatically trigger budget recalculation)
-      await updateTransaction(transactionId, updateData);
-      
-      // Wait a moment for the budget recalculation to complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Refresh data to show updated budgets
+      await updateTransaction(transactionId, editData);
       await fetchData();
-      
       setEditingId(null);
       setEditData({});
-      setEditAllocations([]);
-      setIsSplitMode(prev => {
-        const newState = { ...prev };
-        delete newState[transactionId];
-        return newState;
+      
+      await showAlert({
+        title: 'Success',
+        message: 'Transaction updated successfully',
+        variant: 'success'
       });
     } catch (error) {
       console.error('Error updating transaction:', error);
@@ -446,76 +383,13 @@ export const Transactions: React.FC = () => {
         message: 'Error updating transaction. Please try again.',
         variant: 'error'
       });
-    } finally {
-      setSavingEdit(false);
     }
   };
 
-  const handleReceiptUpload = async (transactionId: string, file: File) => {
-    setUploadingReceipt(transactionId);
-    try {
-      const receiptUrl = await uploadReceiptFile(file, transactionId);
-      
-      await updateTransaction(transactionId, {
-        receiptUrl,
-        receiptFileName: file.name,
-      });
-
-      await fetchData();
-    } catch (error) {
-      console.error('Error uploading receipt:', error);
-      await showAlert({
-        title: 'Error',
-        message: 'Error uploading receipt. Please try again.',
-        variant: 'error'
-      });
-    } finally {
-      setUploadingReceipt(null);
-    }
-  };
-
-  const handleReceiptFileChange = (transactionId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleReceiptUpload(transactionId, file);
-    }
-    // Reset the input value to allow re-uploading the same file
-    event.target.value = '';
-  };
-
-  const handleReceiptDelete = async (transactionId: string, receiptUrl: string) => {
-    const confirmed = await showConfirm({
-      title: 'Delete Receipt',
-      message: 'Are you sure you want to delete this receipt?',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      variant: 'danger'
-    });
-
-    if (!confirmed) return;
-
-    try {
-      await deleteReceiptFile(receiptUrl);
-      await updateTransaction(transactionId, {
-        receiptUrl: null,
-        receiptFileName: null,
-      });
-
-      await fetchData();
-    } catch (error) {
-      console.error('Error deleting receipt:', error);
-      await showAlert({
-        title: 'Error',
-        message: 'Error deleting receipt. Please try again.',
-        variant: 'error'
-      });
-    }
-  };
-
-  const handleDeleteTransaction = async (transactionId: string) => {
+  const handleDelete = async (transactionId: string, description: string) => {
     const confirmed = await showConfirm({
       title: 'Delete Transaction',
-      message: 'Are you sure you want to delete this transaction?',
+      message: `Are you sure you want to delete the transaction "${description}"? This action cannot be undone.`,
       confirmText: 'Delete',
       cancelText: 'Cancel',
       variant: 'danger'
@@ -544,106 +418,108 @@ export const Transactions: React.FC = () => {
     }
   };
 
-  const handleRecalculateBudgets = async () => {
-    const confirmed = await showConfirm({
-      title: 'Recalculate Budgets',
-      message: 'This will recalculate all budget spent amounts based on current transactions. Continue?',
-      confirmText: 'Recalculate',
-      cancelText: 'Cancel',
-      variant: 'info'
-    });
+  const handleSplitTransaction = (transactionId: string) => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
 
-    if (!confirmed) return;
+    // Initialize with current allocation or empty
+    if (transaction.allocations && transaction.allocations.length > 0) {
+      setSplitAllocations(transaction.allocations.map(alloc => ({
+        subOrgId: alloc.subOrgId,
+        amount: alloc.amount
+      })));
+    } else if (transaction.subOrgId) {
+      setSplitAllocations([{
+        subOrgId: transaction.subOrgId,
+        amount: transaction.debitAmount
+      }]);
+    } else {
+      setSplitAllocations([{ subOrgId: '', amount: 0 }]);
+    }
+    
+    setShowSplitModal(transactionId);
+  };
 
-    setConfirmLoading(true);
+  const addSplitAllocation = () => {
+    setSplitAllocations([...splitAllocations, { subOrgId: '', amount: 0 }]);
+  };
+
+  const removeSplitAllocation = (index: number) => {
+    if (splitAllocations.length > 1) {
+      setSplitAllocations(splitAllocations.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateSplitAllocation = (index: number, field: 'subOrgId' | 'amount', value: string | number) => {
+    const updated = [...splitAllocations];
+    updated[index] = { ...updated[index], [field]: value };
+    setSplitAllocations(updated);
+  };
+
+  const saveSplitTransaction = async () => {
+    if (!showSplitModal) return;
+
+    const transaction = transactions.find(t => t.id === showSplitModal);
+    if (!transaction) return;
+
+    // Validate allocations
+    const validAllocations = splitAllocations.filter(alloc => alloc.subOrgId && alloc.amount > 0);
+    if (validAllocations.length === 0) {
+      await showAlert({
+        title: 'Validation Error',
+        message: 'Please add at least one valid allocation',
+        variant: 'error'
+      });
+      return;
+    }
+
+    const totalAllocated = validAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+    if (Math.abs(totalAllocated - transaction.debitAmount) > 0.01) {
+      await showAlert({
+        title: 'Validation Error',
+        message: `Total allocated amount ($${totalAllocated.toFixed(2)}) must equal transaction amount ($${transaction.debitAmount.toFixed(2)})`,
+        variant: 'error'
+      });
+      return;
+    }
+
     try {
-      setLoading(true);
-      await recalculateAllBudgets();
+      // Create allocations with organization names and percentages
+      const allocations = validAllocations.map((alloc, index) => {
+        const subOrg = subOrgs.find(org => org.id === alloc.subOrgId);
+        return {
+          id: `${showSplitModal}-${index}`,
+          subOrgId: alloc.subOrgId,
+          subOrgName: subOrg?.name || 'Unknown',
+          amount: alloc.amount,
+          percentage: (alloc.amount / transaction.debitAmount) * 100
+        };
+      });
+
+      await updateTransaction(showSplitModal, {
+        allocations,
+        subOrgId: null, // Clear legacy allocation
+        subOrgName: null // Clear legacy allocation
+      });
+
       await fetchData();
+      setShowSplitModal(null);
+      setSplitAllocations([]);
+
       await showAlert({
         title: 'Success',
-        message: 'Budget recalculation completed successfully!',
+        message: 'Transaction split successfully',
         variant: 'success'
       });
     } catch (error) {
-      console.error('Error recalculating budgets:', error);
+      console.error('Error splitting transaction:', error);
       await showAlert({
         title: 'Error',
-        message: 'Error recalculating budgets. Please try again.',
-        variant: 'error'
-      });
-    } finally {
-      setLoading(false);
-      setConfirmLoading(false);
-    }
-  };
-
-  const handleSelectPO = (transactionId: string) => {
-    setShowPOModal(transactionId);
-    setPOSearchTerm('');
-  };
-
-  const handleLinkPO = async (transactionId: string, poId: string) => {
-    setLinkingPO(true);
-    try {
-      const selectedPO = purchasedPOs.find(po => po.id === poId);
-      await updateTransaction(transactionId, {
-        linkedPOId: poId,
-        linkedPOName: selectedPO?.name || `PO #${poId.slice(-6).toUpperCase()}`
-      });
-
-      await fetchData();
-      setShowPOModal(null);
-    } catch (error) {
-      console.error('Error linking PO:', error);
-      await showAlert({
-        title: 'Error',
-        message: 'Error linking PO. Please try again.',
-        variant: 'error'
-      });
-    } finally {
-      setLinkingPO(false);
-    }
-  };
-
-  const handleUnlinkPO = async (transactionId: string) => {
-    const confirmed = await showConfirm({
-      title: 'Unlink Purchase Order',
-      message: 'Are you sure you want to unlink this PO?',
-      confirmText: 'Unlink',
-      cancelText: 'Cancel',
-      variant: 'warning'
-    });
-
-    if (!confirmed) return;
-
-    try {
-      await updateTransaction(transactionId, {
-        linkedPOId: null,
-        linkedPOName: null
-      });
-
-      await fetchData();
-    } catch (error) {
-      console.error('Error unlinking PO:', error);
-      await showAlert({
-        title: 'Error',
-        message: 'Error unlinking PO. Please try again.',
+        message: 'Error splitting transaction. Please try again.',
         variant: 'error'
       });
     }
   };
-
-  const filteredPOs = purchasedPOs.filter(po => {
-    if (!poSearchTerm) return true;
-    const searchLower = poSearchTerm.toLowerCase();
-    return (
-      po.name?.toLowerCase().includes(searchLower) ||
-      po.id.toLowerCase().includes(searchLower) ||
-      po.creatorName.toLowerCase().includes(searchLower) ||
-      po.subOrgName.toLowerCase().includes(searchLower)
-    );
-  });
 
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
   const allocatedTransactions = filteredTransactions.filter(t => 
@@ -652,40 +528,6 @@ export const Transactions: React.FC = () => {
   const unallocatedAmount = filteredTransactions
     .filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0))
     .reduce((sum, t) => sum + t.debitAmount, 0);
-
-  const getTransactionAllocationDisplay = (transaction: Transaction) => {
-    if (transaction.allocations && transaction.allocations.length > 0) {
-      if (transaction.allocations.length === 1) {
-        const allocation = transaction.allocations[0];
-        return (
-          <div className="flex items-center space-x-2">
-            <span className="text-gray-300">{allocation.subOrgName}</span>
-            <Badge variant="info" size="sm">
-              ${allocation.amount.toFixed(2)}
-            </Badge>
-          </div>
-        );
-      } else {
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Split className="h-3 w-3 text-blue-400" />
-              <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
-            </div>
-            {transaction.allocations.map((allocation, index) => (
-              <div key={index} className="text-xs text-gray-400 ml-4">
-                {allocation.subOrgName}: ${allocation.amount.toFixed(2)}
-              </div>
-            ))}
-          </div>
-        );
-      }
-    } else if (transaction.subOrgName) {
-      return <span className="text-gray-300">{transaction.subOrgName}</span>;
-    } else {
-      return <Badge variant="warning" size="sm">Unallocated</Badge>;
-    }
-  };
 
   if (loading) {
     return (
@@ -700,34 +542,34 @@ export const Transactions: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-100">Transactions</h1>
         <div className="flex space-x-3">
-          {/* Hidden file input */}
-          <input
-            id="excel-upload"
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleExcelUpload}
-            className="hidden"
-            disabled={processingExcel}
-          />
-          
-          {/* Visible upload button */}
+          {hasRole('purchaser') && (
+            <>
+              <input
+                id="transaction-import"
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={importing}
+              />
+              <Button 
+                onClick={() => document.getElementById('transaction-import')?.click()}
+                disabled={importing} 
+                loading={importing}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel
+              </Button>
+            </>
+          )}
           <Button 
-            onClick={triggerFileUpload}
-            disabled={processingExcel} 
-            loading={processingExcel}
+            variant="outline" 
+            onClick={handleExport}
+            loading={exportLoading}
+            disabled={exportLoading}
           >
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Excel
-          </Button>
-          
-          <Button variant="outline" onClick={handleExport}>
             <Download className="h-4 w-4 mr-2" />
             Export
-          </Button>
-
-          <Button variant="outline" onClick={handleRecalculateBudgets}>
-            <Building className="h-4 w-4 mr-2" />
-            Recalculate Budgets
           </Button>
         </div>
       </div>
@@ -791,28 +633,51 @@ export const Transactions: React.FC = () => {
         </Card>
       </div>
 
+      {/* Filters */}
+      <Card>
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search transactions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
+              />
+            </div>
+          </div>
+          <div className="sm:w-48">
+            <select
+              value={subOrgFilter}
+              onChange={(e) => setSubOrgFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+            >
+              <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
+              <option value="unallocated" className="text-gray-100 bg-gray-700">Unallocated</option>
+              {subOrgs.map(org => (
+                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
+                  {org.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </Card>
+
       {/* Transactions Table */}
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Transaction History</CardTitle>
-            <div className="flex items-center space-x-4">
-              <select
-                value={subOrgFilter}
-                onChange={(e) => setSubOrgFilter(e.target.value)}
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 text-sm"
-              >
-                <option value="all" className="text-gray-100 bg-gray-700">All Organizations</option>
-                <option value="unallocated" className="text-gray-100 bg-gray-700">Unallocated</option>
-                {subOrgs.map(org => (
-                  <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-              <div className="text-sm text-gray-400">
-                {filteredTransactions.length} rows
-              </div>
+            <div className="text-sm text-gray-400">
+              {filteredTransactions.length} rows
+              {subOrgFilter !== 'all' && subOrgFilter !== 'unallocated' && (
+                <div className="text-xs text-blue-400 mt-1">
+                  Includes split transactions
+                </div>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -825,16 +690,17 @@ export const Transactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Description</th>
                 <th className="text-right py-3 px-4 font-medium text-gray-200">Amount</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
-                <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
+                {hasRole('purchaser') && (
+                  <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.map((transaction) => {
                 const isEditing = editingId === transaction.id;
-
+                
                 return (
                   <tr key={transaction.id} className="border-b border-gray-700 hover:bg-gray-700/50">
                     <td className="py-4 px-4 text-gray-300">
@@ -847,182 +713,33 @@ export const Transactions: React.FC = () => {
                       ${transaction.debitAmount.toFixed(2)}
                     </td>
                     <td className="py-4 px-4">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          {/* Split Mode Toggle */}
+                      {transaction.allocations && transaction.allocations.length > 0 ? (
+                        transaction.allocations.length === 1 ? (
                           <div className="flex items-center space-x-2">
-                            <Button
-                              variant={isSplitMode[transaction.id] ? "primary" : "outline"}
-                              size="sm"
-                              onClick={() => toggleSplitMode(transaction.id)}
-                              disabled={savingEdit}
-                            >
-                              <Split className="h-3 w-3 mr-1" />
-                              {isSplitMode[transaction.id] ? 'Split Mode' : 'Single Mode'}
-                            </Button>
-                            {isSplitMode[transaction.id] && (
-                              <span className="text-xs text-gray-400">
-                                Total: ${editAllocations.reduce((sum, a) => sum + a.amount, 0).toFixed(2)} / ${transaction.debitAmount.toFixed(2)}
-                              </span>
-                            )}
+                            <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
+                            <Badge variant="info" size="sm">
+                              ${transaction.allocations[0].amount.toFixed(2)}
+                            </Badge>
                           </div>
-
-                          {/* Single Mode */}
-                          {!isSplitMode[transaction.id] && (
-                            <select
-                              value={editData.subOrgId || ''}
-                              onChange={(e) => setEditData({ ...editData, subOrgId: e.target.value })}
-                              className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                              disabled={savingEdit}
-                            >
-                              <option value="" className="text-gray-100 bg-gray-700">Select organization</option>
-                              {subOrgs.map(org => (
-                                <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">
-                                  {org.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-
-                          {/* Split Mode */}
-                          {isSplitMode[transaction.id] && (
-                            <div className="space-y-2">
-                              {editAllocations.map((allocation, index) => (
-                                <div key={allocation.id} className="flex items-center space-x-2 p-2 bg-gray-700 rounded">
-                                  <select
-                                    value={allocation.subOrgId}
-                                    onChange={(e) => updateAllocation(allocation.id, 'subOrgId', e.target.value)}
-                                    className="flex-1 px-2 py-1 text-xs bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                                    disabled={savingEdit}
-                                  >
-                                    <option value="">Select org</option>
-                                    {subOrgs.map(org => (
-                                      <option key={org.id} value={org.id}>
-                                        {org.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <input
-                                    type="number"
-                                    value={allocation.amount}
-                                    onChange={(e) => updateAllocation(allocation.id, 'amount', parseFloat(e.target.value) || 0)}
-                                    className="w-20 px-2 py-1 text-xs bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                                    placeholder="Amount"
-                                    min="0"
-                                    max={transaction.debitAmount}
-                                    step="0.01"
-                                    disabled={savingEdit}
-                                  />
-                                  <span className="text-xs text-gray-400 w-12">
-                                    {allocation.percentage.toFixed(0)}%
-                                  </span>
-                                  {editAllocations.length > 1 && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeAllocation(allocation.id)}
-                                      disabled={savingEdit}
-                                      className="p-1 text-red-400 hover:text-red-300"
-                                    >
-                                      <Minus className="h-3 w-3" />
-                                    </Button>
-                                  )}
-                                </div>
-                              ))}
-                              
-                              {/* Add Allocation Button */}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => addAllocation(transaction.id)}
-                                disabled={savingEdit || editAllocations.reduce((sum, a) => sum + a.amount, 0) >= transaction.debitAmount}
-                                className="w-full"
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add Allocation
-                              </Button>
-                              
-                              {/* Validation Message */}
-                              {editAllocations.reduce((sum, a) => sum + a.amount, 0) > transaction.debitAmount && (
-                                <div className="text-xs text-red-400">
-                                  Total allocations exceed transaction amount!
-                                </div>
-                              )}
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div>
-                          {transaction.allocations && transaction.allocations.length > 0 ? (
-                            transaction.allocations.length === 1 ? (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
-                                <Badge variant="info" size="sm">
-                                  ${transaction.allocations[0].amount.toFixed(2)}
-                                </Badge>
-                              </div>
-                            ) : (
-                              <div className="space-y-1">
-                                <div className="flex items-center space-x-2">
-                                  <Split className="h-3 w-3 text-blue-400" />
-                                  <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                            <div className="space-y-1">
+                              {transaction.allocations.map((allocation, index) => (
+                                <div key={index} className="text-xs text-gray-400 flex justify-between items-center">
+                                  <span className="truncate mr-2">{allocation.subOrgName}:</span>
+                                  <span className="font-medium">${allocation.amount.toFixed(2)}</span>
                                 </div>
-                                {transaction.allocations.map((allocation, index) => (
-                                  <div key={index} className="text-xs text-gray-400 ml-4">
-                                    {allocation.subOrgName}: ${allocation.amount.toFixed(2)}
-                                  </div>
-                                ))}
-                              </div>
-                            )
-                          ) : transaction.subOrgName ? (
-                            <span className="text-gray-300">{transaction.subOrgName}</span>
-                          ) : (
-                            <Badge variant="warning" size="sm">Unallocated</Badge>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-4 px-4">
-                      {/* Hidden file input for each transaction */}
-                      <input
-                        id={`receipt-upload-${transaction.id}`}
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => handleReceiptFileChange(transaction.id, e)}
-                        className="hidden"
-                        disabled={uploadingReceipt === transaction.id}
-                      />
-                      
-                      {transaction.receiptUrl ? (
-                        <div className="flex items-center space-x-2">
-                          <a
-                            href={transaction.receiptUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-green-400 hover:text-green-300"
-                            title="View Receipt"
-                          >
-                            <Download className="h-4 w-4" />
-                          </a>
-                          <button
-                            onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
-                            className="text-red-400 hover:text-red-300"
-                            title="Delete Receipt"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      ) : transaction.subOrgName ? (
+                        <span className="text-gray-300">{transaction.subOrgName}</span>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => triggerReceiptUpload(transaction.id)}
-                          disabled={uploadingReceipt === transaction.id}
-                          loading={uploadingReceipt === transaction.id}
-                        >
-                          <Upload className="h-3 w-3 mr-1" />
-                          Upload
-                        </Button>
+                        <Badge variant="warning" size="sm">Unallocated</Badge>
                       )}
                     </td>
                     <td className="py-4 px-4">
@@ -1031,9 +748,8 @@ export const Transactions: React.FC = () => {
                           type="text"
                           value={editData.notes || ''}
                           onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                           placeholder="Add notes..."
-                          disabled={savingEdit}
                         />
                       ) : (
                         <span className="text-gray-300 text-sm">
@@ -1043,76 +759,89 @@ export const Transactions: React.FC = () => {
                     </td>
                     <td className="py-4 px-4">
                       {transaction.linkedPOId ? (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleViewPODetails(transaction.linkedPOId!)}
-                            disabled={loadingPODetails}
-                            className="flex items-center space-x-1 hover:bg-gray-600 p-1 rounded transition-colors"
-                          >
-                            <Badge variant="info" size="sm">
-                              {transaction.linkedPOName || `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}`}
-                            </Badge>
-                            <Eye className="h-3 w-3 text-gray-400" />
-                          </button>
-                          <button
-                            onClick={() => handleUnlinkPO(transaction.id)}
-                            className="text-red-400 hover:text-red-300"
-                            title="Unlink PO"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleSelectPO(transaction.id)}
+                        <button
+                          onClick={() => handleViewPODetails(transaction.linkedPOId!)}
+                          disabled={loadingPODetails}
+                          className="flex items-center space-x-1 hover:bg-gray-600 p-1 rounded transition-colors"
                         >
-                          <Link className="h-3 w-3 mr-1" />
-                          Select PO
-                        </Button>
-                      )}
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      {isEditing ? (
-                        <div className="flex items-center justify-center space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={() => saveEdit(transaction.id)}
-                            loading={savingEdit}
-                            disabled={savingEdit}
-                          >
-                            <Save className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={cancelEdit}
-                            disabled={savingEdit}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
+                          <Badge variant="info" size="sm">
+                            {transaction.linkedPOName || `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}`}
+                          </Badge>
+                          <Eye className="h-3 w-3 text-gray-400" />
+                        </button>
+                      ) : isEditing ? (
+                        <select
+                          value={editData.linkedPOId || ''}
+                          onChange={(e) => {
+                            const selectedPO = pos.find(po => po.id === e.target.value);
+                            setEditData({ 
+                              ...editData, 
+                              linkedPOId: e.target.value,
+                              linkedPOName: selectedPO?.name || ''
+                            });
+                          }}
+                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                        >
+                          <option value="">No PO linked</option>
+                          {pos.map(po => (
+                            <option key={po.id} value={po.id}>
+                              {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <div className="flex items-center justify-center space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => startEdit(transaction)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                            className="text-red-400 hover:text-red-300"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <span className="text-gray-500 text-sm">-</span>
                       )}
                     </td>
+                    {hasRole('purchaser') && (
+                      <td className="py-4 px-4 text-center">
+                        {isEditing ? (
+                          <div className="flex items-center justify-center space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={() => saveEdit(transaction.id)}
+                            >
+                              <Save className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelEdit}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEdit(transaction)}
+                              title="Edit transaction"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleSplitTransaction(transaction.id)}
+                              title="Split transaction"
+                            >
+                              <Building className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(transaction.id, transaction.description)}
+                              className="text-red-400 hover:text-red-300"
+                              title="Delete transaction"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1122,108 +851,99 @@ export const Transactions: React.FC = () => {
 
         {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-400 text-lg">
-              {subOrgFilter !== 'all' ? 'No transactions found for the selected organization' : 'No transactions found'}
-            </p>
-            <p className="text-gray-500 mt-2">
-              {subOrgFilter !== 'all' ? 'Try selecting a different organization or clear the filter' : 'Upload an Excel file to get started'}
-            </p>
+            <p className="text-gray-400 text-lg">No transactions found</p>
+            <p className="text-gray-500 mt-2">Import transactions or adjust your filters</p>
           </div>
         )}
       </Card>
 
-      {/* PO Selection Modal */}
-      {showPOModal && createPortal(
-        <div 
-          className="bg-black bg-opacity-75 flex items-center justify-center"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 50,
-            margin: 0,
-            padding: '16px'
-          }}
-        >
-          <div className="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden border border-gray-700">
-            <div className="p-6 border-b border-gray-700">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold text-gray-100">Select Purchase Order</h3>
-                <button
-                  onClick={() => setShowPOModal(null)}
-                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
-                >
-                  <X className="h-5 w-5 text-gray-400" />
-                </button>
+      {/* Split Transaction Modal */}
+      {showSplitModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full border border-gray-700">
+            <div className="flex justify-between items-center p-6 border-b border-gray-700">
+              <h2 className="text-xl font-semibold text-gray-100">Split Transaction</h2>
+              <button
+                onClick={() => setShowSplitModal(null)}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-gray-300">
+                  Total Amount: <span className="font-bold text-green-400">
+                    ${transactions.find(t => t.id === showSplitModal)?.debitAmount.toFixed(2)}
+                  </span>
+                </p>
               </div>
               
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by PO name, ID, creator, or sub-organization..."
-                  value={poSearchTerm}
-                  onChange={(e) => setPOSearchTerm(e.target.value)}
-                  className="pl-10 w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100 placeholder-gray-400"
-                />
+              <div className="space-y-4">
+                {splitAllocations.map((allocation, index) => (
+                  <div key={index} className="flex items-center space-x-4 p-4 bg-gray-700 rounded-lg">
+                    <div className="flex-1">
+                      <select
+                        value={allocation.subOrgId}
+                        onChange={(e) => updateSplitAllocation(index, 'subOrgId', e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                      >
+                        <option value="">Select organization</option>
+                        {subOrgs.map(org => (
+                          <option key={org.id} value={org.id}>{org.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-32">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={allocation.amount}
+                        onChange={(e) => updateSplitAllocation(index, 'amount', parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                        placeholder="Amount"
+                      />
+                    </div>
+                    {splitAllocations.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeSplitAllocation(index)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-between items-center mt-6">
+                <Button
+                  variant="outline"
+                  onClick={addSplitAllocation}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Allocation
+                </Button>
+                
+                <div className="flex space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowSplitModal(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={saveSplitTransaction}>
+                    Save Split
+                  </Button>
+                </div>
               </div>
             </div>
-
-            <div className="max-h-96 overflow-y-auto p-6">
-              {filteredPOs.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-400">No purchased POs found</p>
-                  <p className="text-gray-500 text-sm mt-1">
-                    {poSearchTerm ? 'Try adjusting your search terms' : 'No POs have been marked as purchased yet'}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredPOs.map((po) => (
-                    <div
-                      key={po.id}
-                      className="flex justify-between items-center p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h4 className="font-medium text-gray-100">
-                            {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
-                          </h4>
-                          <Badge variant="success" size="sm">Purchased</Badge>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
-                          <div>
-                            <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-200">Sub-Org:</span> {po.subOrgName}
-                          </div>
-                          <div>
-                            <span className="font-medium text-gray-200">Amount:</span> ${po.totalAmount.toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                      <Button
-                        onClick={() => handleLinkPO(showPOModal, po.id)}
-                        loading={linkingPO}
-                        disabled={linkingPO}
-                        size="sm"
-                      >
-                        <Link className="h-4 w-4 mr-1" />
-                        Link
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
-        </div>,
-        document.body
+        </div>
       )}
 
       {/* PO Details Modal */}
@@ -1235,33 +955,6 @@ export const Transactions: React.FC = () => {
           onPOUpdated={() => {}} // No updates needed from transactions page
         />
       )}
-
-      {/* Instructions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Excel Upload Instructions</CardTitle>
-        </CardHeader>
-        <div className="space-y-3 text-sm text-gray-300">
-          <p><strong className="text-gray-200">Required Columns:</strong></p>
-          <ul className="list-disc list-inside space-y-1 ml-4">
-            <li><strong>Post Date:</strong> Transaction date (will be parsed from spreadsheet)</li>
-            <li><strong>Description:</strong> Transaction description</li>
-            <li><strong>Debit:</strong> Transaction amount (must be positive)</li>
-            <li><strong>Status:</strong> Must be "Posted" to be processed</li>
-          </ul>
-          <p className="mt-4"><strong className="text-gray-200">Processing Rules:</strong></p>
-          <ul className="list-disc list-inside space-y-1 ml-4">
-            <li>Only transactions with status "Posted" are imported</li>
-            <li>Only transactions with positive debit amounts are imported</li>
-            <li>Duplicate descriptions are automatically skipped</li>
-            <li>Transaction dates are parsed from the spreadsheet, not the upload date</li>
-            <li>After import, assign transactions to sub-organizations for budget tracking</li>
-            <li>Budget spent amounts are automatically recalculated when transactions are allocated</li>
-            <li>Link transactions to purchased POs for better tracking and reporting</li>
-            <li>Click on linked PO badges to view detailed purchase order information</li>
-          </ul>
-        </div>
-      </Card>
 
       {/* Custom Modals */}
       <ConfirmModal
