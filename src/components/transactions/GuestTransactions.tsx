@@ -36,14 +36,26 @@ export const GuestTransactions: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Apply sub-organization filter
+    // Apply sub-organization filter (including split transactions)
     let filtered = transactions;
 
     if (subOrgFilter !== 'all') {
       if (subOrgFilter === 'unallocated') {
-        filtered = filtered.filter(t => !t.subOrgId);
+        // Only truly unallocated transactions (no subOrgId and no allocations)
+        filtered = filtered.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0));
       } else {
-        filtered = filtered.filter(t => t.subOrgId === subOrgFilter);
+        // Include transactions where the org is either the primary allocation or part of a split
+        filtered = filtered.filter(t => {
+          // Check legacy single allocation
+          if (t.subOrgId === subOrgFilter) return true;
+          
+          // Check split allocations
+          if (t.allocations && t.allocations.length > 0) {
+            return t.allocations.some(allocation => allocation.subOrgId === subOrgFilter);
+          }
+          
+          return false;
+        });
       }
     }
 
@@ -124,9 +136,11 @@ export const GuestTransactions: React.FC = () => {
   };
 
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
-  const allocatedTransactions = filteredTransactions.filter(t => t.subOrgId).length;
+  const allocatedTransactions = filteredTransactions.filter(t => 
+    t.subOrgId || (t.allocations && t.allocations.length > 0)
+  ).length;
   const unallocatedAmount = filteredTransactions
-    .filter(t => !t.subOrgId)
+    .filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0))
     .reduce((sum, t) => sum + t.debitAmount, 0);
 
   if (loading) {
@@ -247,6 +261,11 @@ export const GuestTransactions: React.FC = () => {
               </select>
               <div className="text-sm text-gray-400">
                 {filteredTransactions.length} rows
+                {subOrgFilter !== 'all' && subOrgFilter !== 'unallocated' && (
+                  <div className="text-xs text-blue-400 mt-1">
+                    Includes split transactions
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -279,10 +298,25 @@ export const GuestTransactions: React.FC = () => {
                   <td className="py-4 px-4">
                     {transaction.allocations && transaction.allocations.length > 0 ? (
                       transaction.allocations.length === 1 ? (
-                        <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
-                      ) : (
                         <div className="flex items-center space-x-2">
-                          <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                          <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
+                          <Badge variant="info" size="sm">
+                            ${transaction.allocations[0].amount.toFixed(2)}
+                          </Badge>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                          </div>
+                          <div className="space-y-1">
+                            {transaction.allocations.map((allocation, index) => (
+                              <div key={index} className="text-xs text-gray-400 flex justify-between items-center">
+                                <span className="truncate mr-2">{allocation.subOrgName}:</span>
+                                <span className="font-medium">${allocation.amount.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       )
                     ) : transaction.subOrgName ? (
@@ -349,12 +383,14 @@ export const GuestTransactions: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Allocated Transactions:</span>
-                <span className="text-green-400 font-medium">{transactions.filter(t => t.subOrgId).length}</span>
+                <span className="text-green-400 font-medium">
+                  {transactions.filter(t => t.subOrgId || (t.allocations && t.allocations.length > 0)).length}
+                </span>
               </div>
               <div className="flex justify-between border-t border-gray-700 pt-2">
                 <span className="text-gray-300 font-medium">Unallocated Amount:</span>
                 <span className="text-yellow-400 font-bold">
-                  ${transactions.filter(t => !t.subOrgId).reduce((sum, t) => sum + t.debitAmount, 0).toLocaleString()}
+                  ${transactions.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0)).reduce((sum, t) => sum + t.debitAmount, 0).toLocaleString()}
                 </span>
               </div>
             </div>
@@ -364,8 +400,19 @@ export const GuestTransactions: React.FC = () => {
             <h4 className="text-sm font-medium text-gray-200 mb-3">Organization Breakdown</h4>
             <div className="space-y-2 text-sm max-h-32 overflow-y-auto">
               {subOrgs.map(org => {
-                const orgTransactions = transactions.filter(t => t.subOrgId === org.id);
-                const orgSpent = orgTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
+                // Calculate spending including split allocations
+                const orgSpent = transactions.reduce((sum, t) => {
+                  // Handle split allocations
+                  if (t.allocations && t.allocations.length > 0) {
+                    const orgAllocation = t.allocations.find(a => a.subOrgId === org.id);
+                    return sum + (orgAllocation ? orgAllocation.amount : 0);
+                  }
+                  // Handle legacy single allocation
+                  if (t.subOrgId === org.id) {
+                    return sum + t.debitAmount;
+                  }
+                  return sum;
+                }, 0);
                 
                 if (orgSpent === 0) return null;
                 
