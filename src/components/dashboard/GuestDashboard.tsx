@@ -228,9 +228,7 @@ export const GuestDashboard: React.FC = () => {
               <DollarSign className="h-6 w-6 text-green-400" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-400">
-              <p className="text-2xl font-bold text-gray-100">{allocatedTransactions}</p>
-              </p>
+              <p className="text-sm font-medium text-gray-400">Total Budget</p>
               <p className="text-2xl font-bold text-gray-100">
                 ${totalBudget.toLocaleString()}
               </p>
@@ -360,9 +358,7 @@ export const GuestDashboard: React.FC = () => {
                     No spending recorded for this organization
                   </p>
                 </div>
-                <span className="text-green-400 font-medium">
-                  {allTransactions.filter(t => t.subOrgId || (t.allocations && t.allocations.length > 0)).length}
-                </span>
+              )
             )}
             {selectedSubOrg !== 'all' && filteredTransactions.length > 6 && (
               <div className="text-center pt-2">
@@ -406,19 +402,8 @@ export const GuestDashboard: React.FC = () => {
                         ${budgetRemaining.toLocaleString()}
                       </span>
                     </div>
-                // Calculate spending including split allocations
-                const orgSpent = allTransactions.reduce((sum, t) => {
-                  // Handle split allocations
-                  if (t.allocations && t.allocations.length > 0) {
-                    const orgAllocation = t.allocations.find(a => a.subOrgId === org.id);
-                    return sum + (orgAllocation ? orgAllocation.amount : 0);
-                  }
-                  // Handle legacy single allocation
-                  if (t.subOrgId === org.id) {
-                    return sum + t.debitAmount;
-                  }
-                  return sum;
-                }, 0);
+                  </div>
+                </div>
                 
                 <div>
                   <h4 className="text-sm font-medium text-gray-200 mb-3">
