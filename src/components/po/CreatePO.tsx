@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, ExternalLink, Save, RefreshCw, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Save, RefreshCw, MessageSquare, Building } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
