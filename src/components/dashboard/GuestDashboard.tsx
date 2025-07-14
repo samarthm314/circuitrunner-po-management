@@ -94,6 +94,15 @@ export const GuestDashboard: React.FC = () => {
   const approvedPOs = filteredPOs.filter(po => po.status === 'approved').length;
   const purchasedPOs = filteredPOs.filter(po => po.status === 'purchased').length;
 
+  // Calculate allocated vs unallocated transactions
+  const allocatedTransactions = filteredTransactions.filter(t => 
+    t.subOrgId || (t.allocations && t.allocations.length > 0)
+  ).length;
+  
+  const unallocatedAmount = filteredTransactions
+    .filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0))
+    .reduce((sum, t) => sum + t.debitAmount, 0);
+
   // Determine if this is a signed-in user with no roles or an anonymous guest
   const isSignedInUser = !!currentUser;
   const isAnonymousGuest = !currentUser;
@@ -220,7 +229,7 @@ export const GuestDashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-400">
-                {selectedSubOrg === 'all' ? 'Total Budget' : 'Budget'}
+              <p className="text-2xl font-bold text-gray-100">{allocatedTransactions}</p>
               </p>
               <p className="text-2xl font-bold text-gray-100">
                 ${totalBudget.toLocaleString()}
@@ -351,12 +360,14 @@ export const GuestDashboard: React.FC = () => {
                     No spending recorded for this organization
                   </p>
                 </div>
-              )
+                <span className="text-green-400 font-medium">
+                  {allTransactions.filter(t => t.subOrgId || (t.allocations && t.allocations.length > 0)).length}
+                </span>
             )}
             {selectedSubOrg !== 'all' && filteredTransactions.length > 6 && (
               <div className="text-center pt-2">
                 <span className="text-sm text-gray-400">
-                  +{filteredTransactions.length - 6} more transactions
+                  ${allTransactions.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0)).reduce((sum, t) => sum + t.debitAmount, 0).toLocaleString()}
                 </span>
               </div>
             )}
@@ -395,8 +406,19 @@ export const GuestDashboard: React.FC = () => {
                         ${budgetRemaining.toLocaleString()}
                       </span>
                     </div>
-                  </div>
-                </div>
+                // Calculate spending including split allocations
+                const orgSpent = allTransactions.reduce((sum, t) => {
+                  // Handle split allocations
+                  if (t.allocations && t.allocations.length > 0) {
+                    const orgAllocation = t.allocations.find(a => a.subOrgId === org.id);
+                    return sum + (orgAllocation ? orgAllocation.amount : 0);
+                  }
+                  // Handle legacy single allocation
+                  if (t.subOrgId === org.id) {
+                    return sum + t.debitAmount;
+                  }
+                  return sum;
+                }, 0);
                 
                 <div>
                   <h4 className="text-sm font-medium text-gray-200 mb-3">
