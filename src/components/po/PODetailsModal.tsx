@@ -298,7 +298,12 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
               <Building className="h-4 w-4 text-gray-500" />
               <div>
                 <p className="text-sm text-gray-400">Sub-Organization</p>
-                <p className="font-medium text-gray-200">{po.subOrgName}</p>
+                <p className="font-medium text-gray-200">
+                  {po.organizations && po.organizations.length > 1 
+                    ? `${po.organizations.length} Organizations` 
+                    : po.subOrgName
+                  }
+                </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -320,6 +325,35 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Budget Allocation - Show for multi-organization POs */}
+          {po.organizations && po.organizations.length > 1 && (
+            <div className="bg-gray-700 border border-gray-600 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-200 mb-3 flex items-center">
+                <Building className="h-4 w-4 mr-2" />
+                Budget Allocation
+              </h3>
+              <div className="space-y-3">
+                {po.organizations.map((org, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-gray-600 rounded">
+                    <div>
+                      <p className="font-medium text-gray-100">{org.subOrgName}</p>
+                      <p className="text-sm text-gray-400">{org.percentage.toFixed(1)}% of total</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-green-400">${org.allocatedAmount.toFixed(2)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 pt-3 border-t border-gray-600 flex justify-between items-center">
+                <span className="font-medium text-gray-200">Total Allocated:</span>
+                <span className="font-bold text-green-400">
+                  ${po.organizations.reduce((sum, org) => sum + org.allocatedAmount, 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Approval and Purchase Tracking - Always show if data exists */}
           {(po.approvedByName || po.purchasedByName) && (
