@@ -947,21 +947,44 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price<span className="text-red-400">*</span></label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={item.unitPrice === 0 ? '' : item.unitPrice}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        // Store the raw value, convert to number for calculations
-                        const numValue = value === '' ? 0 : parseFloat(value) || 0;
-                        updateLineItem(item.id, 'unitPrice', numValue);
-                      }}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                      placeholder="0.00"
-                    />
-                  </div>
+  <label className="block text-xs font-medium text-gray-300 mb-1">
+    Unit Price<span className="text-red-400">*</span>
+  </label>
+
+  <input
+    /* keep the numeric keypad on mobile */
+    type="number"
+    inputMode="decimal"
+    step="0.01"
+    min="0"
+
+    /* don’t force trailing zeros while typing */
+    value={item.unitPrice === 0 ? '' : item.unitPrice}
+
+    onChange={(e) => {
+      const val = e.target.value;
+
+      // allow empty string or partial decimals
+      const num = val === '' ? 0 : parseFloat(val);
+      updateLineItem(item.id, 'unitPrice', isNaN(num) ? 0 : num);
+    }}
+
+    onBlur={(e) => {
+      // round to 2 dp when the user leaves the field
+      const num = parseFloat(e.target.value);
+      updateLineItem(
+        item.id,
+        'unitPrice',
+        isNaN(num) ? 0 : Number(num.toFixed(2))
+      );
+    }}
+
+    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded
+               focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+    placeholder="0.00"
+  />
+</div>
+
                   <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
                     <div className="flex">
