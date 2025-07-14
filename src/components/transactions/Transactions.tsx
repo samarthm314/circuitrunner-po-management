@@ -952,7 +952,34 @@ export const Transactions: React.FC = () => {
                           )}
                         </div>
                       ) : (
-                        getTransactionAllocationDisplay(transaction)
+                        <div>
+                          {transaction.allocations && transaction.allocations.length > 0 ? (
+                            transaction.allocations.length === 1 ? (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
+                                <Badge variant="info" size="sm">
+                                  ${transaction.allocations[0].amount.toFixed(2)}
+                                </Badge>
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="flex items-center space-x-2">
+                                  <Split className="h-3 w-3 text-blue-400" />
+                                  <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                                </div>
+                                {transaction.allocations.map((allocation, index) => (
+                                  <div key={index} className="text-xs text-gray-400 ml-4">
+                                    {allocation.subOrgName}: ${allocation.amount.toFixed(2)}
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          ) : transaction.subOrgName ? (
+                            <span className="text-gray-300">{transaction.subOrgName}</span>
+                          ) : (
+                            <Badge variant="warning" size="sm">Unallocated</Badge>
+                          )}
+                        </div>
                       )}
                     </td>
                     <td className="py-4 px-4">
