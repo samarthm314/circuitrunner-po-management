@@ -942,7 +942,7 @@ export const CreatePO: React.FC = () => {
                       type="number"
                       min="1"
                       value={item.quantity}
-                      onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 1)}
+                      onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
                     />
                   </div>
