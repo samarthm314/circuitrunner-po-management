@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../config/firebase';
-import { Transaction } from '../types';
+import { Transaction, TransactionAllocation } from '../types';
 import { updateSubOrgBudget, getSubOrganizations } from './subOrgService';
 
 export const createTransaction = async (transactionData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -273,7 +273,14 @@ export const recalculateAllBudgets = async () => {
     const spentBySubOrg: { [key: string]: number } = {};
     
     allTransactions.forEach(transaction => {
-      if (transaction.subOrgId) {
+      // Handle both old single allocation and new split allocations
+      if (transaction.allocations && transaction.allocations.length > 0) {
+        // New split allocation system
+        transaction.allocations.forEach(allocation => {
+          spentBySubOrg[allocation.subOrgId] = (spentBySubOrg[allocation.subOrgId] || 0) + allocation.amount;
+        });
+      } else if (transaction.subOrgId) {
+        // Legacy single allocation system (backward compatibility)
         spentBySubOrg[transaction.subOrgId] = (spentBySubOrg[transaction.subOrgId] || 0) + transaction.debitAmount;
       }
     });

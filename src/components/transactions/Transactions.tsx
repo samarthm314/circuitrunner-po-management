@@ -17,9 +17,12 @@ import {
   Building,
   Link,
   Search,
-  Eye
+  Eye,
+  Split,
+  Plus,
+  Minus
 } from 'lucide-react';
-import { Transaction, SubOrganization, PurchaseOrder } from '../../types';
+import { Transaction, SubOrganization, PurchaseOrder, TransactionAllocation } from '../../types';
 import { 
   getAllTransactions, 
   updateTransaction, 
@@ -47,6 +50,8 @@ export const Transactions: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Transaction>>({});
+  const [editAllocations, setEditAllocations] = useState<TransactionAllocation[]>([]);
+  const [isSplitMode, setIsSplitMode] = useState<{ [key: string]: boolean }>({});
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
   const [processingExcel, setProcessingExcel] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -77,9 +82,12 @@ export const Transactions: React.FC = () => {
 
     if (subOrgFilter !== 'all') {
       if (subOrgFilter === 'unallocated') {
-        filtered = filtered.filter(t => !t.subOrgId);
+        filtered = filtered.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0));
       } else {
-        filtered = filtered.filter(t => t.subOrgId === subOrgFilter);
+        filtered = filtered.filter(t => 
+          t.subOrgId === subOrgFilter || 
+          (t.allocations && t.allocations.some(a => a.subOrgId === subOrgFilter))
+        );
       }
     }
 
@@ -244,6 +252,27 @@ export const Transactions: React.FC = () => {
 
   const startEdit = (transaction: Transaction) => {
     setEditingId(transaction.id);
+    
+    // Initialize allocations for split mode
+    if (transaction.allocations && transaction.allocations.length > 0) {
+      setEditAllocations([...transaction.allocations]);
+      setIsSplitMode(prev => ({ ...prev, [transaction.id]: true }));
+    } else if (transaction.subOrgId) {
+      // Convert single allocation to split format
+      setEditAllocations([{
+        id: '1',
+        subOrgId: transaction.subOrgId,
+        subOrgName: transaction.subOrgName || '',
+        amount: transaction.debitAmount,
+        percentage: 100
+      }]);
+      setIsSplitMode(prev => ({ ...prev, [transaction.id]: false }));
+    } else {
+      // Unallocated transaction
+      setEditAllocations([]);
+      setIsSplitMode(prev => ({ ...prev, [transaction.id]: false }));
+    }
+    
     setEditData({
       subOrgId: transaction.subOrgId,
       subOrgName: transaction.subOrgName,
@@ -254,24 +283,139 @@ export const Transactions: React.FC = () => {
   const cancelEdit = () => {
     setEditingId(null);
     setEditData({});
+    setEditAllocations([]);
+    setIsSplitMode(prev => {
+      const newState = { ...prev };
+      if (editingId) {
+        delete newState[editingId];
+      }
+      return newState;
+    });
+  };
+
+  const toggleSplitMode = (transactionId: string) => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+    
+    const currentSplitMode = isSplitMode[transactionId];
+    
+    if (!currentSplitMode) {
+      // Switching to split mode
+      if (editAllocations.length === 0) {
+        // Start with one allocation for the full amount
+        setEditAllocations([{
+          id: '1',
+          subOrgId: '',
+          subOrgName: '',
+          amount: transaction.debitAmount,
+          percentage: 100
+        }]);
+      }
+    } else {
+      // Switching to single mode - keep only the first allocation
+      if (editAllocations.length > 0) {
+        const firstAllocation = editAllocations[0];
+        setEditData({
+          ...editData,
+          subOrgId: firstAllocation.subOrgId,
+          subOrgName: firstAllocation.subOrgName
+        });
+        setEditAllocations([firstAllocation]);
+      }
+    }
+    
+    setIsSplitMode(prev => ({ ...prev, [transactionId]: !currentSplitMode }));
+  };
+
+  const addAllocation = (transactionId: string) => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+    
+    const usedAmount = editAllocations.reduce((sum, a) => sum + a.amount, 0);
+    const remainingAmount = transaction.debitAmount - usedAmount;
+    
+    if (remainingAmount > 0) {
+      const newAllocation: TransactionAllocation = {
+        id: Date.now().toString(),
+        subOrgId: '',
+        subOrgName: '',
+        amount: remainingAmount,
+        percentage: (remainingAmount / transaction.debitAmount) * 100
+      };
+      
+      setEditAllocations(prev => [...prev, newAllocation]);
+    }
+  };
+
+  const removeAllocation = (allocationId: string) => {
+    setEditAllocations(prev => prev.filter(a => a.id !== allocationId));
+  };
+
+  const updateAllocation = (allocationId: string, field: keyof TransactionAllocation, value: string | number) => {
+    const transaction = transactions.find(t => t.id === editingId);
+    if (!transaction) return;
+    
+    setEditAllocations(prev => prev.map(allocation => {
+      if (allocation.id === allocationId) {
+        const updated = { ...allocation, [field]: value };
+        
+        // Update sub-org name when sub-org ID changes
+        if (field === 'subOrgId') {
+          const selectedSubOrg = subOrgs.find(org => org.id === value);
+          updated.subOrgName = selectedSubOrg?.name || '';
+        }
+        
+        // Recalculate percentage when amount changes
+        if (field === 'amount') {
+          updated.percentage = transaction.debitAmount > 0 ? ((value as number) / transaction.debitAmount) * 100 : 0;
+        }
+        
+        return updated;
+      }
+      return allocation;
+    }));
   };
 
   const saveEdit = async (transactionId: string) => {
     setSavingEdit(true);
     try {
-      const selectedSubOrg = subOrgs.find(org => org.id === editData.subOrgId);
+      const transaction = transactions.find(t => t.id === transactionId);
+      if (!transaction) return;
       
       // Clean the update data to remove undefined values
       const updateData: Partial<Transaction> = {};
       
-      if (editData.subOrgId !== undefined) {
-        updateData.subOrgId = editData.subOrgId || null; // Use null instead of empty string
-      }
-      
-      if (selectedSubOrg?.name) {
-        updateData.subOrgName = selectedSubOrg.name;
-      } else if (editData.subOrgId === '') {
-        updateData.subOrgName = null; // Clear sub-org name if unassigned
+      if (isSplitMode[transactionId]) {
+        // Split mode - save allocations
+        const validAllocations = editAllocations.filter(a => a.subOrgId && a.amount > 0);
+        
+        if (validAllocations.length === 0) {
+          // No valid allocations - clear everything
+          updateData.allocations = null;
+          updateData.subOrgId = null;
+          updateData.subOrgName = null;
+        } else {
+          updateData.allocations = validAllocations;
+          // Clear legacy fields when using allocations
+          updateData.subOrgId = null;
+          updateData.subOrgName = null;
+        }
+      } else {
+        // Single mode - use legacy fields
+        const selectedSubOrg = subOrgs.find(org => org.id === editData.subOrgId);
+        
+        if (editData.subOrgId !== undefined) {
+          updateData.subOrgId = editData.subOrgId || null;
+        }
+        
+        if (selectedSubOrg?.name) {
+          updateData.subOrgName = selectedSubOrg.name;
+        } else if (editData.subOrgId === '') {
+          updateData.subOrgName = null;
+        }
+        
+        // Clear allocations when using single mode
+        updateData.allocations = null;
       }
       
       if (editData.notes !== undefined) {
@@ -289,6 +433,12 @@ export const Transactions: React.FC = () => {
       
       setEditingId(null);
       setEditData({});
+      setEditAllocations([]);
+      setIsSplitMode(prev => {
+        const newState = { ...prev };
+        delete newState[transactionId];
+        return newState;
+      });
     } catch (error) {
       console.error('Error updating transaction:', error);
       await showAlert({
@@ -496,10 +646,46 @@ export const Transactions: React.FC = () => {
   });
 
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
-  const allocatedTransactions = filteredTransactions.filter(t => t.subOrgId).length;
+  const allocatedTransactions = filteredTransactions.filter(t => 
+    t.subOrgId || (t.allocations && t.allocations.length > 0)
+  ).length;
   const unallocatedAmount = filteredTransactions
-    .filter(t => !t.subOrgId)
+    .filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0))
     .reduce((sum, t) => sum + t.debitAmount, 0);
+
+  const getTransactionAllocationDisplay = (transaction: Transaction) => {
+    if (transaction.allocations && transaction.allocations.length > 0) {
+      if (transaction.allocations.length === 1) {
+        const allocation = transaction.allocations[0];
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="text-gray-300">{allocation.subOrgName}</span>
+            <Badge variant="info" size="sm">
+              ${allocation.amount.toFixed(2)}
+            </Badge>
+          </div>
+        );
+      } else {
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <Split className="h-3 w-3 text-blue-400" />
+              <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+            </div>
+            {transaction.allocations.map((allocation, index) => (
+              <div key={index} className="text-xs text-gray-400 ml-4">
+                {allocation.subOrgName}: ${allocation.amount.toFixed(2)}
+              </div>
+            ))}
+          </div>
+        );
+      }
+    } else if (transaction.subOrgName) {
+      return <span className="text-gray-300">{transaction.subOrgName}</span>;
+    } else {
+      return <Badge variant="warning" size="sm">Unallocated</Badge>;
+    }
+  };
 
   if (loading) {
     return (

@@ -59,8 +59,9 @@ export interface Transaction {
   description: string;
   debitAmount: number;
   status: string;
-  subOrgId?: string;
-  subOrgName?: string;
+  subOrgId?: string; // Keep for backward compatibility
+  subOrgName?: string; // Keep for backward compatibility
+  allocations?: TransactionAllocation[]; // New field for split allocations
   receiptUrl?: string;
   receiptFileName?: string;
   notes?: string;
@@ -68,6 +69,14 @@ export interface Transaction {
   linkedPOName?: string; // Added linked PO name field
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface TransactionAllocation {
+  id: string;
+  subOrgId: string;
+  subOrgName: string;
+  amount: number;
+  percentage: number; // Calculated percentage of total transaction
 }
 
 export interface AuditLog {
