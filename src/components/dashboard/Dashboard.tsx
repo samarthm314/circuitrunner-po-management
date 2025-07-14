@@ -153,7 +153,20 @@ export const Dashboard: React.FC = () => {
         transactions = await getAllTransactions();
         setFilteredSubOrgs(subOrgs);
       } else {
-        transactions = await getTransactionsBySubOrg(selectedSubOrg);
+        // Get all transactions and filter to include split transactions
+        const allTransactions = await getAllTransactions();
+        transactions = allTransactions.filter(t => {
+          // Check legacy single allocation
+          if (t.subOrgId === selectedSubOrg) return true;
+          
+          // Check split allocations
+          if (t.allocations && t.allocations.length > 0) {
+            return t.allocations.some(allocation => allocation.subOrgId === selectedSubOrg);
+          }
+          
+          return false;
+        });
+        
         const selectedOrg = subOrgs.find(org => org.id === selectedSubOrg);
         setFilteredSubOrgs(selectedOrg ? [selectedOrg] : []);
       }
@@ -328,7 +341,7 @@ export const Dashboard: React.FC = () => {
               <h3 className="text-blue-300 font-medium mb-1">Active Filters</h3>
               <div className="text-blue-200 text-sm space-y-1">
                 {selectedSubOrg !== 'all' && (
-                  <p>• Budget view filtered to: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
+                  <p>• Budget view filtered to: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong> (includes split transactions)</p>
                 )}
                 {poScope !== 'organization' && (
                   <p>• PO statistics showing: <strong>Your authored POs only</strong></p>
@@ -485,9 +498,35 @@ export const Dashboard: React.FC = () => {
                         {transaction.notes && ` • ${transaction.notes}`}
                       </p>
                     </div>
-                    <span className="text-sm font-medium text-red-400 ml-2">
-                      ${transaction.debitAmount.toFixed(2)}
-                    </span>
+                    <div className="ml-2 text-right">
+                      {transaction.allocations && transaction.allocations.length > 0 ? (
+                        transaction.allocations.length === 1 ? (
+                          <div className="text-right">
+                            <span className="text-gray-300 text-sm">{transaction.allocations[0].subOrgName}</span>
+                            <p className="text-sm font-medium text-red-400">${transaction.allocations[0].amount.toFixed(2)}</p>
+                          </div>
+                        ) : (
+                          <div className="text-right">
+                            <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                            {selectedSubOrg !== 'all' && (
+                              <p className="text-sm font-medium text-red-400 mt-1">
+                                ${transaction.allocations.find(a => a.subOrgId === selectedSubOrg)?.amount.toFixed(2) || '0.00'}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      ) : transaction.subOrgName ? (
+                        <div className="text-right">
+                          <span className="text-gray-300 text-sm">{transaction.subOrgName}</span>
+                          <p className="text-sm font-medium text-red-400">${transaction.debitAmount.toFixed(2)}</p>
+                        </div>
+                      ) : (
+                        <div className="text-right">
+                          <Badge variant="warning" size="sm">Unallocated</Badge>
+                          <p className="text-sm font-medium text-red-400">${transaction.debitAmount.toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (

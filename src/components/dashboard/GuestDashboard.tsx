@@ -210,7 +210,8 @@ export const GuestDashboard: React.FC = () => {
               <h3 className="text-blue-300 font-medium mb-1">Filtered View</h3>
               <div className="text-blue-200 text-sm space-y-1">
                 <p>• Viewing data for: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
-                <p>• Budget, transactions, and PO statistics are filtered to this organization</p>
+                <p>• Includes transactions where this organization is the sole recipient or part of a split</p>
+                <p>• PO statistics include single-org and multi-org purchase orders</p>
                 <p className="text-xs text-blue-300 mt-2">
                   Note: Filter preferences are not saved for guest users and will reset when you refresh the page.
                 </p>
