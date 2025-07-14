@@ -193,15 +193,20 @@ export const CreatePO: React.FC = () => {
           updated.subOrgName = selectedSubOrg?.name || '';
         }
         
+        // Update percentage when amount changes
+        if (field === 'allocatedAmount') {
+          updated.percentage = totalAmount > 0 ? ((value as number) / totalAmount) * 100 : 0;
+        }
+        
         return updated;
       }
       return org;
     });
     
     setSelectedOrganizations(newOrganizations);
-    
-    // Recalculate allocations if in equal mode or if amount changed
-    if (allocationMode === 'equal' || field === 'allocatedAmount') {
+
+    // Only recalculate if in equal mode (manual mode should preserve individual changes)
+    if (allocationMode === 'equal') {
       recalculateAllocations(newOrganizations);
     }
   };
