@@ -150,6 +150,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear any stored authentication data
       localStorage.clear();
       sessionStorage.clear();
+      
+      // Force navigation to root and reload to ensure clean state
+      window.history.replaceState(null, '', '/');
+      window.location.reload();
     } catch (error) {
       console.error('Error during logout:', error);
       
@@ -159,6 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserProfile(null);
       localStorage.clear();
       sessionStorage.clear();
+      
+      // Force navigation to root and reload even on error
+      window.history.replaceState(null, '', '/');
+      window.location.reload();
     }
   };
 

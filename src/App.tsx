@@ -15,8 +15,20 @@ import { UserManagement } from './components/admin/UserManagement';
 import { CookieConsent } from './components/ui/CookieConsent';
 import { LocalStorageNotice } from './components/ui/LocalStorageNotice';
 
+import { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, isGuest, loading } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    // If user is not authenticated and trying to access a protected route
+    if (!loading && !currentUser && !isGuest && location.pathname !== '/') {
+      // Clear any stale state and redirect to root
+      window.history.replaceState(null, '', '/');
+    }
+  }, [currentUser, isGuest, loading, location.pathname]);
 
   if (loading) {
     return (
@@ -26,7 +38,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
 
-  return currentUser || isGuest ? <>{children}</> : <Navigate to="/login" />;
+  return currentUser || isGuest ? <>{children}</> : <Navigate to="/" replace />;
 };
 
 const AppRoutes: React.FC = () => {
@@ -64,7 +76,7 @@ const AppRoutes: React.FC = () => {
         <Route path="/transactions" element={<Transactions />} />
         <Route path="/budget-management" element={<BudgetManagement />} />
         <Route path="/user-management" element={<UserManagement />} />
-        <Route path="*" element={<Navigate to="/dashboard" />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <CookieConsent />
       <LocalStorageNotice />
@@ -73,6 +85,22 @@ const AppRoutes: React.FC = () => {
 };
 
 function App() {
+  useEffect(() => {
+    // Handle browser back/forward navigation edge cases
+    const handlePopState = () => {
+      // If we're on an invalid route and not authenticated, go to root
+      const path = window.location.pathname;
+      const validPaths = ['/', '/dashboard', '/create-po', '/my-pos', '/pending-approval', '/pending-purchase', '/all-pos', '/transactions', '/budget-management', '/user-management'];
+      
+      if (!validPaths.includes(path)) {
+        window.history.replaceState(null, '', '/');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   return (
     <AuthProvider>
       <Router>
