@@ -677,6 +677,26 @@ export const CreatePO: React.FC = () => {
                 </div>
               </div>
               
+              {/* Allocation Mode Information */}
+              <div className="mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-lg">
+                <div className="text-sm text-blue-200">
+                  <p className="font-medium text-blue-300 mb-1">
+                    {allocationMode === 'equal' ? 'Equal Split Mode' : 'Manual Split Mode'}
+                  </p>
+                  {allocationMode === 'equal' ? (
+                    <p>
+                      Amounts are automatically calculated and split equally based on the total of all line items. 
+                      Percentages update after line items are added.
+                    </p>
+                  ) : (
+                    <p>
+                      You can manually set the amount for each organization. 
+                      Percentages update after line items are added and when amounts are changed.
+                    </p>
+                  )}
+                </div>
+              </div>
+              
               {selectedOrganizations.length === 0 ? (
                 <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
                   <Building className="h-8 w-8 text-gray-500 mx-auto mb-2" />
