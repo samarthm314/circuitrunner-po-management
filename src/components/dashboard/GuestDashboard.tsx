@@ -344,11 +344,19 @@ export const GuestDashboard: React.FC = () => {
                       <p className="text-xs text-gray-400">
                         {transaction.postDate.toLocaleDateString()}
                         {transaction.notes && ` • ${transaction.notes}`}
-                      </p>
-                    </div>
-                    <span className="text-sm font-medium text-red-400 ml-2">
-                      ${transaction.debitAmount.toFixed(2)}
-                    </span>
+                    {transaction.allocations && transaction.allocations.length > 0 ? (
+                      transaction.allocations.length === 1 ? (
+                        <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                        </div>
+                      )
+                    ) : transaction.subOrgName ? (
+                      <span className="text-gray-300">{transaction.subOrgName}</span>
+                    ) : (
+                      <Badge variant="warning" size="sm">Unallocated</Badge>
+                    )}
                   </div>
                 ))
               ) : (
