@@ -735,7 +735,7 @@ export const CreatePO: React.FC = () => {
                     size="sm"
                     onClick={toggleAllocationMode}
                   >
-                    {allocationMode === 'equal' ? 'Equal Split' : 'Manual Split'}
+                    {allocationMode === 'equal' ? 'Switch To Manual Split' : 'Switch To Equal Split'}
                   </Button>
                   <Button
                     type="button"
