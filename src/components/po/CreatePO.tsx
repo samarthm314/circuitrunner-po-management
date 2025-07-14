@@ -951,11 +951,12 @@ export const CreatePO: React.FC = () => {
                     <input
                       type="text"
                       inputMode="decimal"
-                      value={item.unitPrice === 0 ? '' : item.unitPrice.toString()}
+                      value={item.unitPrice === 0 ? '' : item.unitPrice}
                       onChange={(e) => {
                         const value = e.target.value;
-                        // Allow any input, convert to number on blur or when valid
-                        updateLineItem(item.id, 'unitPrice', value === '' ? 0 : parseFloat(value) || 0);
+                        // Store the raw value, convert to number for calculations
+                        const numValue = value === '' ? 0 : parseFloat(value) || 0;
+                        updateLineItem(item.id, 'unitPrice', numValue);
                       }}
                       className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
                       placeholder="0.00"
