@@ -719,15 +719,36 @@ export const CreatePO: React.FC = () => {
                             Allocated Amount
                           </label>
                           <input
-                            type="number"
-                            value={org.allocatedAmount.toFixed(2)}
-                            onChange={(e) => updateOrganization(org.id, 'allocatedAmount', parseFloat(e.target.value) || 0)}
-                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-                            min="0"
-                            max={totalAmount}
-                            step="0.01"
+                            /* allow free typing while the field is focused */
+                            type="text"
+                            value={org.allocatedAmount === 0 ? '' : org.allocatedAmount}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                          
+                              // let user delete everything or type partial decimals
+                              if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
+                                updateOrganization(
+                                  org.id,
+                                  'allocatedAmount',
+                                  raw === '' ? 0 : parseFloat(raw)
+                                );
+                              }
+                            }}
+                            onBlur={(e) => {
+                              // final tidy-up: round to 2 dp when they leave the field
+                              const num = parseFloat(e.target.value);
+                              updateOrganization(
+                                org.id,
+                                'allocatedAmount',
+                                isNaN(num) ? 0 : Number(num.toFixed(2))
+                              );
+                            }}
+                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg
+                                       focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                            placeholder="0.00"                /* optional */
                             disabled={allocationMode === 'equal'}
                           />
+
                         </div>
                         
                         <div className="md:col-span-2">
