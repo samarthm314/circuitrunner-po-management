@@ -511,7 +511,7 @@ export const CreatePO: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!currentUser || !userProfile || !selectedOrg) return;
+    if (!currentUser || !userProfile) return;
 
     if (!(await validateForm(false))) return;
 
