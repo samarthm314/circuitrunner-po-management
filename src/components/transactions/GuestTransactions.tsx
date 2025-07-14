@@ -277,11 +277,19 @@ export const GuestTransactions: React.FC = () => {
                     ${transaction.debitAmount.toFixed(2)}
                   </td>
                   <td className="py-4 px-4">
-                    <span className="text-gray-300">
-                      {transaction.subOrgName || (
-                        <Badge variant="warning" size="sm">Unallocated</Badge>
-                      )}
-                    </span>
+                    {transaction.allocations && transaction.allocations.length > 0 ? (
+                      transaction.allocations.length === 1 ? (
+                        <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                        </div>
+                      )
+                    ) : transaction.subOrgName ? (
+                      <span className="text-gray-300">{transaction.subOrgName}</span>
+                    ) : (
+                      <Badge variant="warning" size="sm">Unallocated</Badge>
+                    )}
                   </td>
                   <td className="py-4 px-4">
                     <span className="text-gray-300 text-sm">
