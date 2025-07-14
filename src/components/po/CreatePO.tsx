@@ -264,6 +264,9 @@ export const CreatePO: React.FC = () => {
     }
   };
 
+  // Calculate total amount from line items
+  const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
   const recalculateAllocations = (organizations: POOrganization[]) => {
     if (organizations.length === 0) return;
     
@@ -332,9 +335,6 @@ export const CreatePO: React.FC = () => {
       setPOName(value);
     }
   };
-
-  const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  
   // Calculate budget information for selected organizations
   const getTotalRemainingBudget = () => {
     return selectedOrganizations.reduce((total, org) => {
