@@ -130,7 +130,6 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         'PO Number': `#${po.id.slice(-6).toUpperCase()}`,
         'Status': po.status.charAt(0).toUpperCase() + po.status.slice(1).replace('_', ' '),
         'Created By': po.creatorName,
-        'Sub-Organization': po.subOrgName,
         'Total Amount': `$${po.totalAmount.toFixed(2)}`,
         'Created Date': po.createdAt ? format(new Date(po.createdAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
         'Approved Date': po.approvedAt ? format(new Date(po.approvedAt.seconds * 1000), 'MMM dd, yyyy') : 'N/A',
@@ -139,6 +138,33 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
         'Purchased By': po.purchasedByName || 'N/A',
       };
 
+      // Handle organization allocation properly
+      if (po.organizations && po.organizations.length > 0) {
+        if (po.organizations.length === 1) {
+          // Single organization from new system
+          summaryData['Sub-Organization'] = po.organizations[0].subOrgName;
+          summaryData['Budget Allocation'] = `$${po.organizations[0].allocatedAmount.toFixed(2)} (${po.organizations[0].percentage.toFixed(1)}%)`;
+          summaryData['Allocation Type'] = 'Single Organization';
+        } else {
+          // Multiple organizations
+          summaryData['Sub-Organization'] = `Split across ${po.organizations.length} organizations`;
+          summaryData['Budget Allocation'] = `Total: $${po.totalAmount.toFixed(2)} (split allocation)`;
+          summaryData['Allocation Type'] = 'Multi-Organization Split';
+          summaryData['Split Details'] = po.organizations
+            .map(org => `${org.subOrgName}: $${org.allocatedAmount.toFixed(2)} (${org.percentage.toFixed(1)}%)`)
+            .join('; ');
+        }
+      } else if (po.subOrgName) {
+        // Legacy single organization
+        summaryData['Sub-Organization'] = po.subOrgName;
+        summaryData['Budget Allocation'] = `$${po.totalAmount.toFixed(2)} (100%)`;
+        summaryData['Allocation Type'] = 'Legacy Single Organization';
+      } else {
+        // No organization assigned
+        summaryData['Sub-Organization'] = 'Not Assigned';
+        summaryData['Budget Allocation'] = 'Not Allocated';
+        summaryData['Allocation Type'] = 'Unallocated';
+      }
       // Only include special request and comments if not in guest mode
       if (!shouldHideComments) {
         summaryData['Special Request'] = po.specialRequest || 'None';
@@ -172,7 +198,7 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       // Set column widths for summary sheet
       const summaryColWidths = [
         { wch: 25 }, // Field names
-        { wch: 30 }  // Values
+        { wch: 50 }  // Values (increased for split details)
       ];
       summaryWs['!cols'] = summaryColWidths;
       
@@ -198,6 +224,33 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       
       XLSX.utils.book_append_sheet(wb, lineItemsWs, 'Line Items');
 
+      // Add Budget Allocation sheet for multi-org POs
+      if (po.organizations && po.organizations.length > 1) {
+        const budgetData = po.organizations.map((org, index) => ({
+          'Allocation #': index + 1,
+          'Organization': org.subOrgName,
+          'Allocated Amount': org.allocatedAmount,
+          'Percentage': `${org.percentage.toFixed(1)}%`,
+          'Formatted Amount': `$${org.allocatedAmount.toFixed(2)}`,
+          'PO Total': po.totalAmount,
+          'Formatted PO Total': `$${po.totalAmount.toFixed(2)}`
+        }));
+
+        const budgetWs = XLSX.utils.json_to_sheet(budgetData);
+        
+        // Set column widths for budget allocation sheet
+        budgetWs['!cols'] = [
+          { wch: 12 }, // Allocation #
+          { wch: 25 }, // Organization
+          { wch: 15 }, // Allocated Amount
+          { wch: 12 }, // Percentage
+          { wch: 18 }, // Formatted Amount
+          { wch: 12 }, // PO Total
+          { wch: 18 }  // Formatted PO Total
+        ];
+        
+        XLSX.utils.book_append_sheet(wb, budgetWs, 'Budget Allocation');
+      }
       console.log('Generating filename...');
       
       // Generate filename
@@ -205,7 +258,8 @@ export const PODetailsModal: React.FC<PODetailsModalProps> = ({
       const safeName = poName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const date = new Date().toISOString().split('T')[0];
       const guestSuffix = shouldHideComments ? '_guest' : '';
-      const filename = `${safeName}_Summary${guestSuffix}_${date}.xlsx`;
+      const multiOrgSuffix = po.organizations && po.organizations.length > 1 ? '_multi_org' : '';
+      const filename = `${safeName}_Summary${guestSuffix}${multiOrgSuffix}_${date}.xlsx`;
 
       console.log('Writing file:', filename);
       
