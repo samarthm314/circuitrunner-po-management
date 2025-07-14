@@ -66,12 +66,32 @@ export const GuestDashboard: React.FC = () => {
       const selectedOrg = subOrgs.find(org => org.id === selectedSubOrg);
       setFilteredSubOrgs(selectedOrg ? [selectedOrg] : []);
       
-      // Filter transactions by sub-organization
-      const orgTransactions = allTransactions.filter(t => t.subOrgId === selectedSubOrg);
+      // Filter transactions by sub-organization (including split transactions)
+      const orgTransactions = allTransactions.filter(t => {
+        // Check legacy single allocation
+        if (t.subOrgId === selectedSubOrg) return true;
+        
+        // Check split allocations
+        if (t.allocations && t.allocations.length > 0) {
+          return t.allocations.some(allocation => allocation.subOrgId === selectedSubOrg);
+        }
+        
+        return false;
+      });
       setFilteredTransactions(orgTransactions);
       
-      // Filter POs by sub-organization
-      const orgPOs = allPOs.filter(po => po.subOrgId === selectedSubOrg);
+      // Filter POs by sub-organization (including multi-org POs)
+      const orgPOs = allPOs.filter(po => {
+        // Check legacy single allocation
+        if (po.subOrgId === selectedSubOrg) return true;
+        
+        // Check multi-organization POs
+        if (po.organizations && po.organizations.length > 0) {
+          return po.organizations.some(org => org.subOrgId === selectedSubOrg);
+        }
+        
+        return false;
+      });
       setFilteredPOs(orgPOs);
     }
   }, [selectedSubOrg, subOrgs, allTransactions, allPOs]);
@@ -210,8 +230,7 @@ export const GuestDashboard: React.FC = () => {
               <h3 className="text-blue-300 font-medium mb-1">Filtered View</h3>
               <div className="text-blue-200 text-sm space-y-1">
                 <p>• Viewing data for: <strong>{subOrgs.find(org => org.id === selectedSubOrg)?.name}</strong></p>
-                <p>• Includes transactions where this organization is the sole recipient or part of a split</p>
-                <p>• PO statistics include single-org and multi-org purchase orders</p>
+                <p>• Budget, transactions, and PO statistics are filtered to this organization</p>
                 <p className="text-xs text-blue-300 mt-2">
                   Note: Filter preferences are not saved for guest users and will reset when you refresh the page.
                 </p>
@@ -347,19 +366,32 @@ export const GuestDashboard: React.FC = () => {
                         {transaction.notes && ` • ${transaction.notes}`}
                       </p>
                     </div>
-                    {transaction.allocations && transaction.allocations.length > 0 ? (
-                      transaction.allocations.length === 1 ? (
-                        <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                    <div className="ml-2 text-right">
+                      {transaction.allocations && transaction.allocations.length > 0 ? (
+                        transaction.allocations.length === 1 ? (
+                          <div className="text-right">
+                            <span className="text-gray-300 text-sm">{transaction.allocations[0].subOrgName}</span>
+                            <p className="text-xs text-gray-400">${transaction.allocations[0].amount.toFixed(2)}</p>
+                          </div>
+                        ) : (
+                          <div className="text-right">
+                            <Badge variant="info" size="sm">Split ({transaction.allocations.length})</Badge>
+                            {selectedSubOrg !== 'all' && (
+                              <p className="text-xs text-blue-400 mt-1">
+                                ${transaction.allocations.find(a => a.subOrgId === selectedSubOrg)?.amount.toFixed(2) || '0.00'}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      ) : transaction.subOrgName ? (
+                        <div className="text-right">
+                          <span className="text-gray-300 text-sm">{transaction.subOrgName}</span>
+                          <p className="text-xs text-gray-400">${transaction.debitAmount.toFixed(2)}</p>
                         </div>
-                      )
-                    ) : transaction.subOrgName ? (
-                      <span className="text-gray-300">{transaction.subOrgName}</span>
-                    ) : (
-                      <Badge variant="warning" size="sm">Unallocated</Badge>
-                    )}
+                      ) : (
+                        <Badge variant="warning" size="sm">Unallocated</Badge>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -373,9 +405,12 @@ export const GuestDashboard: React.FC = () => {
             )}
             {selectedSubOrg !== 'all' && filteredTransactions.length > 6 && (
               <div className="text-center pt-2">
-                <span className="text-sm text-gray-400">
-                  ${allTransactions.filter(t => !t.subOrgId && (!t.allocations || t.allocations.length === 0)).reduce((sum, t) => sum + t.debitAmount, 0).toLocaleString()}
-                </span>
+                <button 
+                  onClick={() => navigate('/transactions')}
+                  className="text-sm text-green-400 hover:text-green-300 transition-colors"
+                >
+                  View all {filteredTransactions.length} transactions →
+                </button>
               </div>
             )}
           </div>
