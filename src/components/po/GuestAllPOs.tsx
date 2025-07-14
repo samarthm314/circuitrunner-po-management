@@ -33,13 +33,26 @@ export const GuestAllPOs: React.FC = () => {
     }
 
     if (subOrgFilter !== 'all') {
-      filtered = filtered.filter(po => po.subOrgId === subOrgFilter);
+      filtered = filtered.filter(po => {
+        // Check legacy single allocation
+        if (po.subOrgId === subOrgFilter) return true;
+        
+        // Check multi-organization POs
+        if (po.organizations && po.organizations.length > 0) {
+          return po.organizations.some(org => org.subOrgId === subOrgFilter);
+        }
+        
+        return false;
+      });
     }
 
     if (searchTerm) {
       filtered = filtered.filter(po => 
         po.creatorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.subOrgName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (po.subOrgName && po.subOrgName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (po.organizations && po.organizations.some(org => 
+          org.subOrgName.toLowerCase().includes(searchTerm.toLowerCase())
+        )) ||
         po.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (po.name && po.name.toLowerCase().includes(searchTerm.toLowerCase()))
       );
@@ -234,7 +247,7 @@ export const GuestAllPOs: React.FC = () => {
       <div className="text-sm text-gray-400 mb-4">
         Showing {filteredPOs.length} of {pos.length} purchase orders
         {statusFilter !== 'all' && ` (status: ${statusFilter.replace('_', ' ')})`}
-        {subOrgFilter !== 'all' && ` (organization: ${subOrgs.find(org => org.id === subOrgFilter)?.name})`}
+        {subOrgFilter !== 'all' && ` (organization: ${subOrgs.find(org => org.id === subOrgFilter)?.name}${subOrgFilter !== 'all' ? ' - includes multi-org POs' : ''})`}
         {searchTerm && ` (search: "${searchTerm}")`}
       </div>
 
@@ -280,7 +293,16 @@ export const GuestAllPOs: React.FC = () => {
                             <span className="font-medium text-gray-200">Creator:</span> {po.creatorName}
                           </div>
                           <div>
-                            <span className="font-medium text-gray-200">Sub-Organization:</span> {po.subOrgName}
+                            <span className="font-medium text-gray-200">Sub-Organization:</span> 
+                            {po.organizations && po.organizations.length > 1 ? (
+                              <div className="inline-flex items-center ml-1">
+                                <Badge variant="info" size="sm">
+                                  {po.organizations.length} Organizations
+                                </Badge>
+                              </div>
+                            ) : (
+                              <span className="ml-1">{po.subOrgName}</span>
+                            )}
                           </div>
                           <div>
                             <span className="font-medium text-gray-200">Total Amount:</span> ${po.totalAmount.toFixed(2)}
