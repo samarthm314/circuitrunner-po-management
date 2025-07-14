@@ -31,12 +31,14 @@ export interface PurchaseOrder {
   name: string; // Added PO name field
   creatorId: string;
   creatorName: string;
-  subOrgId: string;
-  subOrgName: string;
+  subOrgId?: string; // Keep for backward compatibility
+  subOrgName?: string; // Keep for backward compatibility
+  organizations: POOrganization[]; // New field for multiple organizations
   status: 'draft' | 'pending_approval' | 'approved' | 'declined' | 'pending_purchase' | 'purchased';
   specialRequest?: string;
   lineItems: LineItem[];
   totalAmount: number;
+  organizationAllocations?: POAllocation[]; // Budget allocation across organizations
   adminComments?: string;
   purchaserComments?: string; // Added purchaser comments field
   overBudgetJustification?: string;
@@ -53,6 +55,20 @@ export interface PurchaseOrder {
   receiptUrl?: string;
 }
 
+export interface POOrganization {
+  id: string;
+  subOrgId: string;
+  subOrgName: string;
+  allocatedAmount: number;
+  percentage: number;
+}
+
+export interface POAllocation {
+  subOrgId: string;
+  subOrgName: string;
+  allocatedAmount: number;
+  percentage: number;
+}
 export interface Transaction {
   id: string;
   postDate: Date;

@@ -17,8 +17,9 @@ import { PurchaseOrder, LineItem } from '../types';
 export const createPO = async (poData: {
   creatorId: string;
   creatorName: string;
-  subOrgId: string;
-  subOrgName: string;
+  organizations: any[];
+  subOrgId?: string; // Keep for backward compatibility
+  subOrgName?: string; // Keep for backward compatibility
   specialRequest?: string;
   lineItems: LineItem[];
   totalAmount: number;

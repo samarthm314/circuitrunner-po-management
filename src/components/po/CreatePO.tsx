@@ -22,7 +22,8 @@ export const CreatePO: React.FC = () => {
   
   const [subOrganizations, setSubOrganizations] = useState<SubOrganization[]>([]);
   const [poName, setPOName] = useState('');
-  const [selectedSubOrg, setSelectedSubOrg] = useState<string>('');
+  const [selectedOrganizations, setSelectedOrganizations] = useState<POOrganization[]>([]);
+  const [allocationMode, setAllocationMode] = useState<'equal' | 'manual'>('equal');
   const [specialRequest, setSpecialRequest] = useState('');
   const [overBudgetJustification, setOverBudgetJustification] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,7 +77,27 @@ export const CreatePO: React.FC = () => {
         setOriginalPOStatus(po.status);
         setOriginalAdminComments(po.adminComments || null);
         setPOName(po.name || '');
-        setSelectedSubOrg(po.subOrgId);
+        
+        // Handle both new multi-org and legacy single org
+        if (po.organizations && po.organizations.length > 0) {
+          setSelectedOrganizations(po.organizations);
+          setAllocationMode(po.organizations.every(org => 
+            Math.abs(org.percentage - (100 / po.organizations.length)) < 0.01
+          ) ? 'equal' : 'manual');
+        } else if (po.subOrgId) {
+          // Convert legacy single org to new format
+          const legacyOrg = subOrganizations.find(org => org.id === po.subOrgId);
+          if (legacyOrg) {
+            setSelectedOrganizations([{
+              id: '1',
+              subOrgId: po.subOrgId,
+              subOrgName: po.subOrgName || legacyOrg.name,
+              allocatedAmount: po.totalAmount,
+              percentage: 100
+            }]);
+          }
+        }
+        
         setSpecialRequest(po.specialRequest || '');
         setOverBudgetJustification(po.overBudgetJustification || '');
         setLineItems(po.lineItems);
@@ -187,6 +208,104 @@ export const CreatePO: React.FC = () => {
     updateLineItem(id, 'unitPrice', dollars);
   };
 
+  const addOrganization = () => {
+    const availableOrgs = subOrganizations.filter(org => 
+      !selectedOrganizations.some(selected => selected.subOrgId === org.id)
+    );
+    
+    if (availableOrgs.length === 0) return;
+    
+    const newOrg: POOrganization = {
+      id: Date.now().toString(),
+      subOrgId: availableOrgs[0].id,
+      subOrgName: availableOrgs[0].name,
+      allocatedAmount: 0,
+      percentage: 0
+    };
+    
+    const newOrganizations = [...selectedOrganizations, newOrg];
+    setSelectedOrganizations(newOrganizations);
+    
+    // Recalculate allocations
+    recalculateAllocations(newOrganizations);
+  };
+
+  const removeOrganization = (orgId: string) => {
+    if (selectedOrganizations.length <= 1) return;
+    
+    const newOrganizations = selectedOrganizations.filter(org => org.id !== orgId);
+    setSelectedOrganizations(newOrganizations);
+    
+    // Recalculate allocations
+    recalculateAllocations(newOrganizations);
+  };
+
+  const updateOrganization = (orgId: string, field: keyof POOrganization, value: string | number) => {
+    const newOrganizations = selectedOrganizations.map(org => {
+      if (org.id === orgId) {
+        const updated = { ...org, [field]: value };
+        
+        // Update sub-org name when sub-org ID changes
+        if (field === 'subOrgId') {
+          const selectedSubOrg = subOrganizations.find(subOrg => subOrg.id === value);
+          updated.subOrgName = selectedSubOrg?.name || '';
+        }
+        
+        return updated;
+      }
+      return org;
+    });
+    
+    setSelectedOrganizations(newOrganizations);
+    
+    // Recalculate allocations if in equal mode or if amount changed
+    if (allocationMode === 'equal' || field === 'allocatedAmount') {
+      recalculateAllocations(newOrganizations);
+    }
+  };
+
+  const recalculateAllocations = (organizations: POOrganization[]) => {
+    if (organizations.length === 0) return;
+    
+    if (allocationMode === 'equal') {
+      // Equal distribution
+      const amountPerOrg = totalAmount / organizations.length;
+      const percentagePerOrg = 100 / organizations.length;
+      
+      const updatedOrganizations = organizations.map(org => ({
+        ...org,
+        allocatedAmount: amountPerOrg,
+        percentage: percentagePerOrg
+      }));
+      
+      setSelectedOrganizations(updatedOrganizations);
+    } else {
+      // Manual mode - recalculate percentages based on amounts
+      const updatedOrganizations = organizations.map(org => ({
+        ...org,
+        percentage: totalAmount > 0 ? (org.allocatedAmount / totalAmount) * 100 : 0
+      }));
+      
+      setSelectedOrganizations(updatedOrganizations);
+    }
+  };
+
+  const toggleAllocationMode = () => {
+    const newMode = allocationMode === 'equal' ? 'manual' : 'equal';
+    setAllocationMode(newMode);
+    
+    if (newMode === 'equal') {
+      recalculateAllocations(selectedOrganizations);
+    }
+  };
+
+  // Recalculate allocations when total amount changes
+  useEffect(() => {
+    if (selectedOrganizations.length > 0) {
+      recalculateAllocations(selectedOrganizations);
+    }
+  }, [totalAmount]);
+
   const handlePriceKeyDown = (id: string, event: React.KeyboardEvent) => {
     if (event.key === 'Backspace') {
       const currentValue = priceInputs[id] || '';
@@ -215,9 +334,33 @@ export const CreatePO: React.FC = () => {
   };
 
   const totalAmount = lineItems.reduce((sum, item) => sum + item.totalPrice, 0);
-  const selectedOrg = subOrganizations.find(org => org.id === selectedSubOrg);
-  const remainingBudget = selectedOrg ? selectedOrg.budgetAllocated - selectedOrg.budgetSpent : 0;
-  const isOverBudget = totalAmount > remainingBudget;
+  
+  // Calculate budget information for selected organizations
+  const getTotalRemainingBudget = () => {
+    return selectedOrganizations.reduce((total, org) => {
+      const subOrg = subOrganizations.find(sub => sub.id === org.subOrgId);
+      if (subOrg) {
+        const remaining = subOrg.budgetAllocated - subOrg.budgetSpent;
+        return total + remaining;
+      }
+      return total;
+    }, 0);
+  };
+  
+  const getOverBudgetOrganizations = () => {
+    return selectedOrganizations.filter(org => {
+      const subOrg = subOrganizations.find(sub => sub.id === org.subOrgId);
+      if (subOrg) {
+        const remaining = subOrg.budgetAllocated - subOrg.budgetSpent;
+        return org.allocatedAmount > remaining;
+      }
+      return false;
+    });
+  };
+  
+  const totalRemainingBudget = getTotalRemainingBudget();
+  const overBudgetOrgs = getOverBudgetOrganizations();
+  const isOverBudget = overBudgetOrgs.length > 0;
 
   const sortLineItemsByVendor = (items: LineItem[]): LineItem[] => {
     return [...items].sort((a, b) => {
@@ -253,10 +396,21 @@ export const CreatePO: React.FC = () => {
       return false;
     }
 
-    if (!selectedOrg) {
+    if (selectedOrganizations.length === 0) {
       await showAlert({
         title: 'Validation Error',
-        message: 'Please select a sub-organization',
+        message: 'Please select at least one sub-organization',
+        variant: 'error'
+      });
+      return false;
+    }
+    
+    // Validate allocation totals
+    const totalAllocated = selectedOrganizations.reduce((sum, org) => sum + org.allocatedAmount, 0);
+    if (Math.abs(totalAllocated - totalAmount) > 0.01) {
+      await showAlert({
+        title: 'Allocation Error',
+        message: `Total allocated amount ($${totalAllocated.toFixed(2)}) must equal PO total ($${totalAmount.toFixed(2)})`,
         variant: 'error'
       });
       return false;
@@ -302,8 +456,11 @@ export const CreatePO: React.FC = () => {
         name: poName.trim(),
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
-        subOrgId: selectedSubOrg,
-        subOrgName: selectedOrg!.name,
+        organizations: selectedOrganizations,
+        // Keep legacy fields for backward compatibility
+        subOrgId: selectedOrganizations.length === 1 ? selectedOrganizations[0].subOrgId : null,
+        subOrgName: selectedOrganizations.length === 1 ? selectedOrganizations[0].subOrgName : 
+                   selectedOrganizations.map(org => org.subOrgName).join(', '),
         lineItems: lineItems, // Don't filter or sort for drafts
         totalAmount,
         status: 'draft'
@@ -373,8 +530,11 @@ export const CreatePO: React.FC = () => {
         name: poName.trim(),
         creatorId: currentUser.uid,
         creatorName: userProfile.displayName,
-        subOrgId: selectedSubOrg,
-        subOrgName: selectedOrg.name,
+        organizations: selectedOrganizations,
+        // Keep legacy fields for backward compatibility
+        subOrgId: selectedOrganizations.length === 1 ? selectedOrganizations[0].subOrgId : null,
+        subOrgName: selectedOrganizations.length === 1 ? selectedOrganizations[0].subOrgName : 
+                   selectedOrganizations.map(org => org.subOrgName).join(', '),
         lineItems: sortedLineItems, // Use sorted line items
         totalAmount,
         status: 'pending_approval'
@@ -562,39 +722,179 @@ export const CreatePO: React.FC = () => {
               </div>
             </div>
 
+            {/* Multi-Organization Selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Select Sub-Organization <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={selectedSubOrg}
-                onChange={(e) => setSelectedSubOrg(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-                required
-              >
-                <option value="" className="text-gray-300">Select a sub-organization</option>
-                {subOrganizations.map(org => (
-                  <option key={org.id} value={org.id} className="text-gray-100 bg-gray-700">{org.name}</option>
-                ))}
-              </select>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Sub-Organizations <span className="text-red-400">*</span>
+                </label>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    type="button"
+                    variant={allocationMode === 'equal' ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={toggleAllocationMode}
+                  >
+                    {allocationMode === 'equal' ? 'Equal Split' : 'Manual Split'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addOrganization}
+                    disabled={selectedOrganizations.length >= subOrganizations.length}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Org
+                  </Button>
+                </div>
+              </div>
+              
+              {selectedOrganizations.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-600 rounded-lg p-6 text-center">
+                  <Building className="h-8 w-8 text-gray-500 mx-auto mb-2" />
+                  <p className="text-gray-400 mb-3">No organizations selected</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addOrganization}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Organization
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedOrganizations.map((org, index) => (
+                    <div key={org.id} className="p-4 bg-gray-700 rounded-lg border border-gray-600">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                        <div className="md:col-span-5">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Organization
+                          </label>
+                          <select
+                            value={org.subOrgId}
+                            onChange={(e) => updateOrganization(org.id, 'subOrgId', e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                          >
+                            <option value="">Select organization</option>
+                            {subOrganizations
+                              .filter(subOrg => 
+                                subOrg.id === org.subOrgId || 
+                                !selectedOrganizations.some(selected => selected.subOrgId === subOrg.id)
+                              )
+                              .map(subOrg => (
+                                <option key={subOrg.id} value={subOrg.id}>
+                                  {subOrg.name}
+                                </option>
+                              ))
+                            }
+                          </select>
+                        </div>
+                        
+                        <div className="md:col-span-3">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Allocated Amount
+                          </label>
+                          <input
+                            type="number"
+                            value={org.allocatedAmount.toFixed(2)}
+                            onChange={(e) => updateOrganization(org.id, 'allocatedAmount', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+                            min="0"
+                            max={totalAmount}
+                            step="0.01"
+                            disabled={allocationMode === 'equal'}
+                          />
+                        </div>
+                        
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                            Percentage
+                          </label>
+                          <div className="px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-gray-300 text-center">
+                            {org.percentage.toFixed(1)}%
+                          </div>
+                        </div>
+                        
+                        <div className="md:col-span-2 flex justify-end">
+                          {selectedOrganizations.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeOrganization(org.id)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Budget Status for this organization */}
+                      {org.subOrgId && (
+                        <div className="mt-3 pt-3 border-t border-gray-600">
+                          {(() => {
+                            const subOrg = subOrganizations.find(sub => sub.id === org.subOrgId);
+                            if (!subOrg) return null;
+                            
+                            const remaining = subOrg.budgetAllocated - subOrg.budgetSpent;
+                            const isOrgOverBudget = org.allocatedAmount > remaining;
+                            
+                            return (
+                              <div className={`p-2 rounded ${isOrgOverBudget ? 'bg-red-900/30 border border-red-700' : 'bg-blue-900/30 border border-blue-700'}`}>
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className={isOrgOverBudget ? 'text-red-300' : 'text-blue-300'}>
+                                    {subOrg.name} Budget
+                                  </span>
+                                  <span className={isOrgOverBudget ? 'text-red-400 font-medium' : 'text-blue-400'}>
+                                    ${remaining.toLocaleString()} remaining
+                                  </span>
+                                </div>
+                                {isOrgOverBudget && (
+                                  <p className="text-red-200 text-xs mt-1">
+                                    Exceeds budget by ${(org.allocatedAmount - remaining).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* Allocation Summary */}
+                  <div className="p-3 bg-gray-600 rounded-lg">
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300">Total Allocated:</span>
+                      <span className={`font-medium ${
+                        Math.abs(selectedOrganizations.reduce((sum, org) => sum + org.allocatedAmount, 0) - totalAmount) < 0.01
+                          ? 'text-green-400'
+                          : 'text-red-400'
+                      }`}>
+                        ${selectedOrganizations.reduce((sum, org) => sum + org.allocatedAmount, 0).toFixed(2)} / ${totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {selectedOrg && (
-              <div className="bg-blue-900/30 border border-blue-700 p-4 rounded-lg">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-2 gap-2">
-                  <span className="font-medium text-gray-100">{selectedOrg.name} Budget</span>
-                  <Badge variant={remainingBudget > 0 ? 'success' : 'danger'}>
-                    ${remainingBudget.toLocaleString()} remaining
+            {/* Combined Budget Overview */}
+            {selectedOrganizations.length > 0 && (
+              <div className={`p-4 rounded-lg border ${isOverBudget ? 'bg-red-900/30 border-red-700' : 'bg-blue-900/30 border-blue-700'}`}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`font-medium ${isOverBudget ? 'text-red-300' : 'text-blue-300'}`}>
+                    Combined Budget Status
+                  </span>
+                  <Badge variant={isOverBudget ? 'danger' : 'success'}>
+                    {isOverBudget ? `${overBudgetOrgs.length} org(s) over budget` : 'Within budget'}
                   </Badge>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-                  <div
-                    className="h-2 rounded-full bg-blue-500"
-                    style={{ width: `${Math.min((selectedOrg.budgetSpent / selectedOrg.budgetAllocated) * 100, 100)}%` }}
-                  />
-                </div>
-                <div className="text-sm text-gray-300">
-                  ${selectedOrg.budgetSpent.toLocaleString()} of ${selectedOrg.budgetAllocated.toLocaleString()} allocated
+                <div className={`text-sm ${isOverBudget ? 'text-red-200' : 'text-blue-200'}`}>
+                  Total remaining across selected organizations: ${totalRemainingBudget.toLocaleString()}
                 </div>
               </div>
             )}
@@ -761,8 +1061,23 @@ export const CreatePO: React.FC = () => {
             </CardHeader>
             <div className="mb-4">
               <p className="text-sm text-yellow-200 mb-2">
-                This PO exceeds the remaining budget by ${(totalAmount - remainingBudget).toFixed(2)}
+                {overBudgetOrgs.length === 1 
+                  ? `${overBudgetOrgs[0].subOrgName} exceeds budget`
+                  : `${overBudgetOrgs.length} organizations exceed their budgets`
+                }
               </p>
+              <div className="space-y-1 mb-3">
+                {overBudgetOrgs.map(org => {
+                  const subOrg = subOrganizations.find(sub => sub.id === org.subOrgId);
+                  const remaining = subOrg ? subOrg.budgetAllocated - subOrg.budgetSpent : 0;
+                  const excess = org.allocatedAmount - remaining;
+                  return (
+                    <p key={org.id} className="text-xs text-yellow-300">
+                      • {org.subOrgName}: ${excess.toFixed(2)} over budget
+                    </p>
+                  );
+                })}
+              </div>
               <textarea
                 value={overBudgetJustification}
                 onChange={(e) => setOverBudgetJustification(e.target.value)}
@@ -780,9 +1095,21 @@ export const CreatePO: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-100">PO Summary</h3>
-              <p className="text-sm text-gray-300">{lineItems.length} line items</p>
+              <div className="text-sm text-gray-300 space-y-1">
+                <p>{lineItems.length} line item{lineItems.length !== 1 ? 's' : ''}</p>
+                <p>{selectedOrganizations.length} organization{selectedOrganizations.length !== 1 ? 's' : ''}</p>
+              </div>
               {poName && (
                 <p className="text-sm text-gray-400 mt-1 truncate">Name: {poName}</p>
+              )}
+              {selectedOrganizations.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {selectedOrganizations.map(org => (
+                    <p key={org.id} className="text-xs text-gray-400">
+                      {org.subOrgName}: ${org.allocatedAmount.toFixed(2)} ({org.percentage.toFixed(1)}%)
+                    </p>
+                  ))}
+                </div>
               )}
             </div>
             <div className="text-right">
