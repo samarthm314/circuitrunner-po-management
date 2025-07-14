@@ -937,15 +937,43 @@ export const CreatePO: React.FC = () => {
                     />
                   </div>
                   <div className="lg:col-span-1">
-                    <label className="block text-xs font-medium text-gray-300 mb-1">Qty<span className="text-red-400">*</span></label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.quantity}
-                      onChange={(e) => updateLineItem(item.id, 'quantity', parseInt(e.target.value) || 0)}
-                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                    />
-                  </div>
+  <label className="block text-xs font-medium text-gray-300 mb-1">
+    Qty<span className="text-red-400">*</span>
+  </label>
+
+  <input
+    /* numeric keypad on mobile, but let the user clear/retype */
+    type="number"
+    inputMode="numeric"
+    step="1"
+    min="1"
+
+    /* don’t force “0” while they’re typing */
+    value={item.quantity === 0 ? '' : item.quantity}
+
+    onChange={(e) => {
+      const raw = e.target.value;
+
+      // allow empty string or positive integers
+      if (raw === '' || /^\d+$/.test(raw)) {
+        const num = raw === '' ? 0 : parseInt(raw, 10);
+        updateLineItem(item.id, 'quantity', isNaN(num) ? 0 : num);
+      }
+    }}
+
+    onBlur={(e) => {
+      // lock in a valid integer ⩾ 1 when the field loses focus
+      let num = parseInt(e.target.value, 10);
+      if (isNaN(num) || num < 1) num = 1;      // default to 1
+      updateLineItem(item.id, 'quantity', num);
+    }}
+
+    className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded
+               focus:ring-1 focus:ring-green-500 text-gray-100"
+    placeholder="1"
+  />
+</div>
+
                   <div className="lg:col-span-1">
   <label className="block text-xs font-medium text-gray-300 mb-1">
     Unit Price<span className="text-red-400">*</span>
