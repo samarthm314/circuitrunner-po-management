@@ -719,35 +719,40 @@ export const CreatePO: React.FC = () => {
                             Allocated Amount
                           </label>
                           <input
-                            /* allow free typing while the field is focused */
-                            type="text"
-                            value={org.allocatedAmount === 0 ? '' : org.allocatedAmount}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                          
-                              // let user delete everything or type partial decimals
-                              if (raw === '' || /^\d*\.?\d*$/.test(raw)) {
-                                updateOrganization(
-                                  org.id,
-                                  'allocatedAmount',
-                                  raw === '' ? 0 : parseFloat(raw)
-                                );
-                              }
-                            }}
-                            onBlur={(e) => {
-                              // final tidy-up: round to 2 dp when they leave the field
-                              const num = parseFloat(e.target.value);
-                              updateOrganization(
-                                org.id,
-                                'allocatedAmount',
-                                isNaN(num) ? 0 : Number(num.toFixed(2))
-                              );
-                            }}
-                            className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg
-                                       focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-                            placeholder="0.00"                /* optional */
-                            disabled={allocationMode === 'equal'}
-                          />
+  type="number"          /* still gets the numeric keyboard on mobile */
+  inputMode="decimal"    /* helps Android show the right keypad */
+  step="0.01"
+  min="0"
+  max={totalAmount}
+
+  /* 👇  don’t pad with zeros while the user is typing */
+  value={org.allocatedAmount === 0 ? '' : org.allocatedAmount}
+
+  onChange={(e) => {
+    // let the user clear the field or type partial numbers
+    const val = e.target.value;
+    updateOrganization(
+      org.id,
+      'allocatedAmount',
+      val === '' ? 0 : parseFloat(val)
+    );
+  }}
+
+  onBlur={(e) => {
+    // once they leave the field, lock to two decimals
+    const num = parseFloat(e.target.value);
+    updateOrganization(
+      org.id,
+      'allocatedAmount',
+      isNaN(num) ? 0 : Number(num.toFixed(2))
+    );
+  }}
+
+  className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg
+             focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
+  placeholder="0.00"
+  disabled={allocationMode === 'equal'}
+/>
 
                         </div>
                         
