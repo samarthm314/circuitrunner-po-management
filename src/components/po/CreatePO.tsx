@@ -36,14 +36,6 @@ export const CreatePO: React.FC = () => {
     { id: '1', vendor: '', itemName: '', sku: '', quantity: 1, unitPrice: 0, link: '', notes: '', totalPrice: 0 }
   ]);
   
-  // Track the raw input values for price fields (in cents)
-  const [priceInputs, setPriceInputs] = useState<{ [key: string]: string }>({
-    '1': ''
-  });
-
-  // Refs for price inputs to control cursor position
-  const priceInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
-
   useEffect(() => {
     const fetchSubOrganizations = async () => {
       try {
@@ -102,18 +94,6 @@ export const CreatePO: React.FC = () => {
         setOverBudgetJustification(po.overBudgetJustification || '');
         setLineItems(po.lineItems);
         
-        // Set up price inputs for existing line items (convert to cents display)
-        const newPriceInputs: { [key: string]: string } = {};
-        po.lineItems.forEach(item => {
-          if (item.unitPrice > 0) {
-            // Convert dollars to cents for display
-            const cents = Math.round(item.unitPrice * 100);
-            newPriceInputs[item.id] = cents.toString();
-          } else {
-            newPriceInputs[item.id] = '';
-          }
-        });
-        setPriceInputs(newPriceInputs);
       } else {
         await showAlert({
           title: 'Error',
@@ -149,19 +129,11 @@ export const CreatePO: React.FC = () => {
       totalPrice: 0
     };
     setLineItems([...lineItems, newItem]);
-    setPriceInputs(prev => ({ ...prev, [newId]: '' }));
   };
 
   const removeLineItem = (id: string) => {
     if (lineItems.length > 1) {
       setLineItems(lineItems.filter(item => item.id !== id));
-      setPriceInputs(prev => {
-        const newInputs = { ...prev };
-        delete newInputs[id];
-        return newInputs;
-      });
-      // Clean up refs
-      delete priceInputRefs.current[id];
     }
   };
 
@@ -176,36 +148,6 @@ export const CreatePO: React.FC = () => {
       }
       return item;
     }));
-  };
-
-  // Format cents as currency display
-  const formatCentsAsCurrency = (cents: string): string => {
-    if (!cents) return '$0.00';
-    
-    // Ensure we have at least 2 digits (pad with leading zeros)
-    const paddedCents = cents.padStart(2, '0');
-    
-    // Split into dollars and cents
-    const dollarsStr = paddedCents.slice(0, -2) || '0';
-    const centsStr = paddedCents.slice(-2);
-    
-    // Format with commas for thousands
-    const dollars = parseInt(dollarsStr).toLocaleString();
-    
-    return `$${dollars}.${centsStr}`;
-  };
-
-  const handlePriceChange = (id: string, value: string) => {
-    // Only allow digits
-    const digitsOnly = value.replace(/[^\d]/g, '');
-    
-    // Store the raw cents value
-    setPriceInputs(prev => ({ ...prev, [id]: digitsOnly }));
-    
-    // Convert cents to dollars for storage
-    const cents = parseInt(digitsOnly) || 0;
-    const dollars = cents / 100;
-    updateLineItem(id, 'unitPrice', dollars);
   };
 
   const addOrganization = () => {
@@ -308,26 +250,6 @@ export const CreatePO: React.FC = () => {
       recalculateAllocations(selectedOrganizations);
     }
   }, [totalAmount]);
-
-  const handlePriceKeyDown = (id: string, event: React.KeyboardEvent) => {
-    if (event.key === 'Backspace') {
-      const currentValue = priceInputs[id] || '';
-      const newValue = currentValue.slice(0, -1);
-      handlePriceChange(id, newValue);
-      event.preventDefault();
-    }
-  };
-
-  const handlePriceFocus = (id: string) => {
-    const input = priceInputRefs.current[id];
-    if (input) {
-      // wait for the native focus to settle, then move caret to end
-      setTimeout(() => {
-        const len = input.value.length;
-        input.setSelectionRange(len, len);
-      }, 0);
-    }
-  };
 
   const handlePONameChange = (value: string) => {
     // Limit to maximum length
@@ -975,18 +897,15 @@ export const CreatePO: React.FC = () => {
                   </div>
                   <div className="lg:col-span-1">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Unit Price<span className="text-red-400">*</span></label>
-                    <div className="relative">
-                      <input
-                        ref={(el) => priceInputRefs.current[item.id] = el}
-                        type="text"
-                        value={formatCentsAsCurrency(priceInputs[item.id] || '')}
-                        onChange={(e) => handlePriceChange(item.id, e.target.value)}
-                        onKeyDown={(e) => handlePriceKeyDown(item.id, e)}
-                        onFocus={() => handlePriceFocus(item.id)}
-                        className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
-                        placeholder="$0.00"
-                      />
-                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.unitPrice || ''}
+                      onChange={(e) => updateLineItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100 placeholder-gray-400"
+                      placeholder="0.00"
+                    />
                   </div>
                   <div className="lg:col-span-2">
                     <label className="block text-xs font-medium text-gray-300 mb-1">Link (Optional)</label>
