@@ -842,29 +842,24 @@ export const Transactions: React.FC = () => {
                           <Eye className="h-3 w-3" />
                         </a>
                       ) : hasRole('purchaser') ? (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
                           <input
                             id={`receipt-${transaction.id}`}
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png,.gif"
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                handleReceiptUpload(transaction.id, file);
-                              }
-                            }}
-                            className="hidden"
-                            disabled={uploadingReceipt === transaction.id}
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => document.getElementById(`receipt-${transaction.id}`)?.click()}
-                            loading={uploadingReceipt === transaction.id}
-                            disabled={uploadingReceipt !== null}
+                          <button
+                            onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
+                            disabled={deletingReceipt === transaction.id || deletingReceipt !== null}
+                            className="flex items-center justify-center w-8 h-8 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
+                            title="Delete receipt reference"
                           >
-                            Upload
-                          </Button>
+                            {deletingReceipt === transaction.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
                         </div>
                       ) : (
                         <span className="text-gray-500 text-sm">No receipt</span>
