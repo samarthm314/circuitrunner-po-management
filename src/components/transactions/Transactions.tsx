@@ -278,9 +278,8 @@ export const Transactions: React.FC = () => {
               'Organization': allocation.subOrgName,
               'Allocated Amount': allocation.amount,
               'Percentage': `${allocation.percentage.toFixed(1)}%`,
-              'Notes': transaction.notes || ''
-            'Notes': transaction.notes || '',
-            'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No'
+              'Notes': transaction.notes || '',
+              'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No'
           });
         });
 
