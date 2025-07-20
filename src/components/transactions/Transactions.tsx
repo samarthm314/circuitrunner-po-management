@@ -27,7 +27,6 @@ import {
   deleteTransaction,
   processExcelData,
   uploadReceiptFile,
-  deleteReceiptFile,
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
@@ -560,7 +559,7 @@ export const Transactions: React.FC = () => {
   const handleReceiptDelete = async (transactionId: string, receiptUrl: string) => {
     const confirmed = await showConfirm({
       title: 'Delete Receipt',
-      message: 'Are you sure you want to delete this receipt? This action cannot be undone.',
+      message: 'Are you sure you want to remove this receipt reference? The file will remain in storage but will no longer be linked to this transaction.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       variant: 'danger'
@@ -570,9 +569,6 @@ export const Transactions: React.FC = () => {
 
     setDeletingReceipt(transactionId);
     try {
-      // Delete the file from storage
-      await deleteReceiptFile(receiptUrl);
-      
       // Update the transaction to remove receipt references
       await updateTransaction(transactionId, {
         receiptUrl: null,
@@ -582,14 +578,14 @@ export const Transactions: React.FC = () => {
       await fetchData();
       await showAlert({
         title: 'Success',
-        message: 'Receipt deleted successfully',
+        message: 'Receipt reference removed successfully',
         variant: 'success'
       });
     } catch (error) {
       console.error('Error deleting receipt:', error);
       await showAlert({
         title: 'Error',
-        message: 'Error deleting receipt. Please try again.',
+        message: 'Error removing receipt reference. Please try again.',
         variant: 'error'
       });
     } finally {
