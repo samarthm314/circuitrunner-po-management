@@ -27,6 +27,7 @@ import {
   deleteTransaction,
   processExcelData,
   uploadReceiptFile,
+  deleteReceiptFile,
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
@@ -54,6 +55,7 @@ export const Transactions: React.FC = () => {
   const [showSplitModal, setShowSplitModal] = useState<string | null>(null);
   const [splitAllocations, setSplitAllocations] = useState<{ subOrgId: string; amount: number }[]>([]);
   const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
+  const [deletingReceipt, setDeletingReceipt] = useState<string | null>(null);
 
   // PO Details Modal State
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -555,6 +557,46 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const handleReceiptDelete = async (transactionId: string, receiptUrl: string) => {
+    const confirmed = await showConfirm({
+      title: 'Delete Receipt',
+      message: 'Are you sure you want to delete this receipt? This action cannot be undone.',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'danger'
+    });
+
+    if (!confirmed) return;
+
+    setDeletingReceipt(transactionId);
+    try {
+      // Delete the file from storage
+      await deleteReceiptFile(receiptUrl);
+      
+      // Update the transaction to remove receipt references
+      await updateTransaction(transactionId, {
+        receiptUrl: null,
+        receiptFileName: null
+      });
+      
+      await fetchData();
+      await showAlert({
+        title: 'Success',
+        message: 'Receipt deleted successfully',
+        variant: 'success'
+      });
+    } catch (error) {
+      console.error('Error deleting receipt:', error);
+      await showAlert({
+        title: 'Error',
+        message: 'Error deleting receipt. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setDeletingReceipt(null);
+    }
+  };
+
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
   const allocatedTransactions = filteredTransactions.filter(t => 
     t.subOrgId || (t.allocations && t.allocations.length > 0)
@@ -830,17 +872,32 @@ export const Transactions: React.FC = () => {
                     </td>
                     <td className="py-4 px-4">
                       {transaction.receiptUrl ? (
-                        <a
-                          href={transaction.receiptUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center space-x-1 text-green-400 hover:text-green-300"
-                        >
-                          <Badge variant="success" size="sm">
-                            {transaction.receiptFileName || 'Receipt'}
-                          </Badge>
-                          <Eye className="h-3 w-3" />
-                        </a>
+                        <div className="flex items-center space-x-2">
+                          <a
+                            href={transaction.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-1 text-green-400 hover:text-green-300"
+                          >
+                            <Badge variant="success" size="sm">
+                              {transaction.receiptFileName || 'Receipt'}
+                            </Badge>
+                            <Eye className="h-3 w-3" />
+                          </a>
+                          {hasRole('purchaser') && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
+                              loading={deletingReceipt === transaction.id}
+                              disabled={deletingReceipt !== null}
+                              className="text-red-400 hover:text-red-300 p-1"
+                              title="Delete receipt"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       ) : hasRole('purchaser') ? (
                         <div className="flex items-center space-x-2">
                           <input
@@ -849,7 +906,7 @@ export const Transactions: React.FC = () => {
                             accept=".pdf,.jpg,.jpeg,.png,.gif"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 min-w-[32px] h-8"
+                              if (file) {
                                 handleReceiptUpload(transaction.id, file);
                               }
                             }}
@@ -863,11 +920,7 @@ export const Transactions: React.FC = () => {
                             loading={uploadingReceipt === transaction.id}
                             disabled={uploadingReceipt !== null}
                           >
-                              {deletingReceipt === transaction.id ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
+                            <Upload className="h-3 w-3 mr-1" />
                             Upload
                           </Button>
                         </div>
