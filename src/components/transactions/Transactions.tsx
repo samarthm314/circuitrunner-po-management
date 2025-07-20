@@ -280,6 +280,7 @@ export const Transactions: React.FC = () => {
               'Percentage': `${allocation.percentage.toFixed(1)}%`,
               'Notes': transaction.notes || '',
               'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No'
+            });
           });
         });
 
