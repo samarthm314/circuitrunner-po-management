@@ -27,7 +27,6 @@ import {
   deleteTransaction,
   processExcelData,
   uploadReceiptFile,
-  uploadReceiptFile,
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
