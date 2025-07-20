@@ -138,7 +138,16 @@ export const uploadReceiptFile = async (file: File, transactionId: string): Prom
 
 export const deleteReceiptFile = async (receiptUrl: string): Promise<void> => {
   try {
-    const storageRef = ref(storage, receiptUrl);
+    // Extract the file path from the URL for Firebase Storage
+    // receiptUrl is a full download URL, we need to extract the path
+    const url = new URL(receiptUrl);
+    const pathMatch = url.pathname.match(/\/o\/(.+?)\?/);
+    if (!pathMatch) {
+      throw new Error('Invalid receipt URL format');
+    }
+    
+    const filePath = decodeURIComponent(pathMatch[1]);
+    const storageRef = ref(storage, filePath);
     await deleteObject(storageRef);
   } catch (error) {
     console.error('Error deleting receipt:', error);
