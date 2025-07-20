@@ -27,6 +27,7 @@ import {
   deleteTransaction,
   processExcelData,
   uploadReceiptFile,
+  uploadReceiptFile,
   recalculateAllBudgets
 } from '../../services/transactionService';
 import { getSubOrganizations } from '../../services/subOrgService';
@@ -53,6 +54,7 @@ export const Transactions: React.FC = () => {
   const [editData, setEditData] = useState<Partial<Transaction>>({});
   const [showSplitModal, setShowSplitModal] = useState<string | null>(null);
   const [splitAllocations, setSplitAllocations] = useState<{ subOrgId: string; amount: number }[]>([]);
+  const [uploadingReceipt, setUploadingReceipt] = useState<string | null>(null);
 
   // PO Details Modal State
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -183,6 +185,8 @@ export const Transactions: React.FC = () => {
           'Status': transaction.status,
           'Notes': transaction.notes || '',
           'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : '',
+          'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No',
+          'Receipt URL': transaction.receiptUrl || '',
           'Created At': transaction.createdAt.toLocaleDateString()
         };
 
@@ -250,6 +254,8 @@ export const Transactions: React.FC = () => {
         { wch: 15 }, // Allocation Type
         { wch: 60 }, // Split Details
         { wch: 15 }, // Linked PO
+        { wch: 15 }, // Receipt
+        { wch: 40 }, // Receipt URL
         { wch: 12 }  // Created At
       ];
       
@@ -274,7 +280,8 @@ export const Transactions: React.FC = () => {
               'Allocated Amount': allocation.amount,
               'Percentage': `${allocation.percentage.toFixed(1)}%`,
               'Notes': transaction.notes || ''
-            });
+            'Notes': transaction.notes || '',
+            'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No'
           });
         });
 
@@ -287,7 +294,8 @@ export const Transactions: React.FC = () => {
           { wch: 25 }, // Organization
           { wch: 15 }, // Allocated Amount
           { wch: 12 }, // Percentage
-          { wch: 30 }  // Notes
+          { wch: 30 }, // Notes
+          { wch: 15 }  // Receipt
         ];
         
         XLSX.utils.book_append_sheet(wb, splitWs, 'Split Details');
@@ -521,6 +529,33 @@ export const Transactions: React.FC = () => {
     }
   };
 
+  const handleReceiptUpload = async (transactionId: string, file: File) => {
+    setUploadingReceipt(transactionId);
+    try {
+      const receiptUrl = await uploadReceiptFile(file, transactionId);
+      await updateTransaction(transactionId, {
+        receiptUrl,
+        receiptFileName: file.name
+      });
+      
+      await fetchData();
+      await showAlert({
+        title: 'Success',
+        message: 'Receipt uploaded successfully',
+        variant: 'success'
+      });
+    } catch (error) {
+      console.error('Error uploading receipt:', error);
+      await showAlert({
+        title: 'Error',
+        message: 'Error uploading receipt. Please try again.',
+        variant: 'error'
+      });
+    } finally {
+      setUploadingReceipt(null);
+    }
+  };
+
   const totalSpent = filteredTransactions.reduce((sum, t) => sum + t.debitAmount, 0);
   const allocatedTransactions = filteredTransactions.filter(t => 
     t.subOrgId || (t.allocations && t.allocations.length > 0)
@@ -692,6 +727,7 @@ export const Transactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
                 {hasRole('purchaser') && (
                   <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
                 )}
@@ -791,6 +827,49 @@ export const Transactions: React.FC = () => {
                         </select>
                       ) : (
                         <span className="text-gray-500 text-sm">-</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4">
+                      {transaction.receiptUrl ? (
+                        <a
+                          href={transaction.receiptUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-1 text-green-400 hover:text-green-300"
+                        >
+                          <Badge variant="success" size="sm">
+                            {transaction.receiptFileName || 'Receipt'}
+                          </Badge>
+                          <Eye className="h-3 w-3" />
+                        </a>
+                      ) : hasRole('purchaser') ? (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            id={`receipt-${transaction.id}`}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.gif"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleReceiptUpload(transaction.id, file);
+                              }
+                            }}
+                            className="hidden"
+                            disabled={uploadingReceipt === transaction.id}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById(`receipt-${transaction.id}`)?.click()}
+                            loading={uploadingReceipt === transaction.id}
+                            disabled={uploadingReceipt !== null}
+                          >
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 text-sm">No receipt</span>
                       )}
                     </td>
                     {hasRole('purchaser') && (

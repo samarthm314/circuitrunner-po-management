@@ -281,6 +281,7 @@ export const GuestTransactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
               </tr>
             </thead>
             <tbody>
@@ -344,6 +345,23 @@ export const GuestTransactions: React.FC = () => {
                       </button>
                     ) : (
                       <span className="text-gray-500 text-sm">-</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-4">
+                    {transaction.receiptUrl ? (
+                      <a
+                        href={transaction.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-1 text-green-400 hover:text-green-300"
+                      >
+                        <Badge variant="success" size="sm">
+                          {transaction.receiptFileName || 'Receipt'}
+                        </Badge>
+                        <Eye className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-500 text-sm">No receipt</span>
                     )}
                   </td>
                 </tr>
