@@ -836,30 +836,34 @@ export const Transactions: React.FC = () => {
                           rel="noopener noreferrer"
                           className="flex items-center space-x-1 text-green-400 hover:text-green-300"
                         >
-                          <Badge variant="success" size="sm">
-                            {transaction.receiptFileName || 'Receipt'}
-                          </Badge>
-                          <Eye className="h-3 w-3" />
-                        </a>
-                      ) : hasRole('purchaser') ? (
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1">
+                            <a
+                              href={transaction.receiptUrl}
+                        <div>
                           <input
                             id={`receipt-${transaction.id}`}
                             type="file"
                             accept=".pdf,.jpg,.jpeg,.png,.gif"
                             onChange={(e) => {
-                          <button
-                            onClick={() => handleReceiptDelete(transaction.id, transaction.receiptUrl!)}
-                            disabled={deletingReceipt === transaction.id || deletingReceipt !== null}
-                            className="flex items-center justify-center w-8 h-8 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
-                            title="Delete receipt reference"
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleReceiptUpload(transaction.id, file);
+                                e.target.value = '';
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById(`receipt-${transaction.id}`)?.click()}
+                            loading={uploadingReceipt === transaction.id}
+                            disabled={uploadingReceipt !== null}
                           >
-                            {deletingReceipt === transaction.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </button>
+                            <Upload className="h-3 w-3 mr-1" />
+                            Upload
+                          </Button>
                         </div>
                       ) : (
                         <span className="text-gray-500 text-sm">No receipt</span>
