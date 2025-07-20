@@ -849,7 +849,7 @@ export const Transactions: React.FC = () => {
                             accept=".pdf,.jpg,.jpeg,.png,.gif"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) {
+                              className="text-red-400 hover:text-red-300 hover:bg-red-900/30 p-2 min-w-[32px] h-8"
                                 handleReceiptUpload(transaction.id, file);
                               }
                             }}
@@ -863,7 +863,11 @@ export const Transactions: React.FC = () => {
                             loading={uploadingReceipt === transaction.id}
                             disabled={uploadingReceipt !== null}
                           >
-                            <Upload className="h-3 w-3 mr-1" />
+                              {deletingReceipt === transaction.id ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-red-400"></div>
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
                             Upload
                           </Button>
                         </div>
