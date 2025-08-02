@@ -883,10 +883,6 @@ export const CreatePO: React.FC = () => {
                 Items will be sorted alphabetically by vendor when submitted
               </p>
             </div>
-            <Button type="button" onClick={addLineItem} variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
           </CardHeader>
           <div className="space-y-4">
             {lineItems.map((item, index) => (
@@ -1059,7 +1055,12 @@ export const CreatePO: React.FC = () => {
               </div>
             ))}
           </div>
+          <Button type="button" onClick={addLineItem} variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+          </Button>
         </Card>
+        
 
         {/* Special Request */}
         <Card>
