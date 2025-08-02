@@ -1056,7 +1056,6 @@ export const CreatePO: React.FC = () => {
             ))}
           </div>
           <Button type="button" onClick={addLineItem} variant="outline" size="sm">
-              <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
         </Card>
