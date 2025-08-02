@@ -1054,7 +1054,7 @@ export const CreatePO: React.FC = () => {
                 </div>
               </div>
             ))}
-              <div className="flex justify-right">
+              <div className="flex justify-end">
                 <Button type="button" onClick={addLineItem} variant="outline">
                   Add Item
                 </Button>
