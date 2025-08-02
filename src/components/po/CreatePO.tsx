@@ -1054,11 +1054,12 @@ export const CreatePO: React.FC = () => {
                 </div>
               </div>
             ))}
-            <Button type="button" onClick={addLineItem} variant="outline" >
-              Add Item
-            </Button>
+              <div className="flex justify-start">
+                <Button type="button" onClick={addLineItem} variant="outline">
+                  Add Item
+                </Button>
+              </div>
           </div>
-          
         </Card>
 
         {/* Special Request */}
