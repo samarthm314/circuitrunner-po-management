@@ -69,6 +69,16 @@ export interface POAllocation {
   allocatedAmount: number;
   percentage: number;
 }
+
+// New interface for PO links with amounts
+export interface POLink {
+  id: string;
+  poId: string;
+  poName: string;
+  amount: number;        // Amount allocated to this PO
+  percentage: number;    // Percentage of transaction total
+}
+
 export interface Transaction {
   id: string;
   postDate: Date;
@@ -81,8 +91,9 @@ export interface Transaction {
   receiptUrl?: string;
   receiptFileName?: string;
   notes?: string;
-  linkedPOId?: string; // Added linked PO ID field
-  linkedPOName?: string; // Added linked PO name field
+  linkedPOId?: string; // Keep for backward compatibility
+  linkedPOName?: string; // Keep for backward compatibility
+  poLinks?: POLink[]; // New field for multiple PO links
   createdAt: Date;
   updatedAt: Date;
 }

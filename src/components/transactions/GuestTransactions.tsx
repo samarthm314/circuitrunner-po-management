@@ -111,7 +111,12 @@ export const GuestTransactions: React.FC = () => {
         'Sub-Organization': transaction.subOrgName || 'Unallocated',
         'Status': transaction.status,
         'Notes': transaction.notes || '',
-        'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : 'None',
+                    'Linked POs': transaction.poLinks && transaction.poLinks.length > 0 
+              ? transaction.poLinks.map(link => `${link.poName}: $${link.amount.toFixed(2)}`).join('; ')
+              : transaction.linkedPOId 
+              ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` 
+              : 'None',
+            'PO Count': transaction.poLinks ? transaction.poLinks.length : (transaction.linkedPOId ? 1 : 0),
         'Created At': transaction.createdAt.toLocaleDateString()
       }));
 
@@ -280,7 +285,7 @@ export const GuestTransactions: React.FC = () => {
                 <th className="text-right py-3 px-4 font-medium text-gray-200">Amount</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Linked POs</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
               </tr>
             </thead>
@@ -332,7 +337,51 @@ export const GuestTransactions: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-4">
-                    {transaction.linkedPOId ? (
+                    {transaction.poLinks && transaction.poLinks.length > 0 ? (
+                      <div className="space-y-1">
+                        {transaction.poLinks.length === 1 ? (
+                          <button
+                            onClick={() => handleViewPODetails(transaction.poLinks![0].poId)}
+                            disabled={loadingPODetails}
+                            className="flex items-center space-x-1 hover:bg-gray-600 p-1 rounded transition-colors"
+                          >
+                            <Badge variant="info" size="sm">
+                              {transaction.poLinks[0].poName}
+                            </Badge>
+                            <span className="text-xs text-gray-400">
+                              ${transaction.poLinks[0].amount.toFixed(2)}
+                            </span>
+                            <Eye className="h-3 w-3 text-gray-400" />
+                          </button>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Badge variant="info" size="sm">
+                                {transaction.poLinks.length} POs
+                              </Badge>
+                              <span className="text-xs text-gray-400">
+                                ${transaction.poLinks.reduce((sum, link) => sum + link.amount, 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              {transaction.poLinks.map((link, index) => (
+                                <div key={index} className="text-xs text-gray-400 flex justify-between items-center">
+                                  <button
+                                    onClick={() => handleViewPODetails(link.poId)}
+                                    className="hover:bg-gray-600 p-1 rounded transition-colors flex items-center space-x-1"
+                                  >
+                                    <span className="truncate mr-1">{link.poName}:</span>
+                                    <span className="font-medium">${link.amount.toFixed(2)}</span>
+                                    <Eye className="h-2 w-2" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : transaction.linkedPOId ? (
+                      // Legacy single PO link
                       <button
                         onClick={() => handleViewPODetails(transaction.linkedPOId!)}
                         disabled={loadingPODetails}

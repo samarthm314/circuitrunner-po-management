@@ -17,7 +17,8 @@ import {
   Save,
   X,
   Plus,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Divide
 } from 'lucide-react';
 import { Transaction, SubOrganization, PurchaseOrder } from '../../types';
 import { 
@@ -32,6 +33,7 @@ import {
 import { getSubOrganizations } from '../../services/subOrgService';
 import { getAllPOs, getPOById } from '../../services/poService';
 import { PODetailsModal } from '../po/PODetailsModal';
+import { POLinkingModal } from './POLinkingModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { GuestTransactions } from './GuestTransactions';
 import { useModal } from '../../hooks/useModal';
@@ -60,6 +62,10 @@ export const Transactions: React.FC = () => {
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [isPODetailsModalOpen, setIsPODetailsModalOpen] = useState(false);
   const [loadingPODetails, setLoadingPODetails] = useState(false);
+
+  // PO Linking Modal State
+  const [isPOLinkingModalOpen, setIsPOLinkingModalOpen] = useState(false);
+  const [selectedTransactionForLinking, setSelectedTransactionForLinking] = useState<Transaction | null>(null);
 
   // If user is a guest, show the guest version
   if (isGuest) {
@@ -184,7 +190,12 @@ export const Transactions: React.FC = () => {
           'Total Amount': transaction.debitAmount,
           'Status': transaction.status,
           'Notes': transaction.notes || '',
-          'Linked PO': transaction.linkedPOId ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` : '',
+          'Linked POs': transaction.poLinks && transaction.poLinks.length > 0 
+            ? transaction.poLinks.map(link => `${link.poName}: $${link.amount.toFixed(2)}`).join('; ')
+            : transaction.linkedPOId 
+            ? `PO #${transaction.linkedPOId.slice(-6).toUpperCase()}` 
+            : '',
+          'PO Count': transaction.poLinks ? transaction.poLinks.length : (transaction.linkedPOId ? 1 : 0),
           'Receipt': transaction.receiptUrl ? (transaction.receiptFileName || 'Yes') : 'No',
           'Receipt URL': transaction.receiptUrl || '',
           'Created At': transaction.createdAt.toLocaleDateString()
@@ -358,6 +369,47 @@ export const Transactions: React.FC = () => {
     setSelectedPO(null);
   };
 
+  const openPOLinkingModal = (transaction: Transaction) => {
+    setSelectedTransactionForLinking(transaction);
+    setIsPOLinkingModalOpen(true);
+  };
+
+  const closePOLinkingModal = () => {
+    setIsPOLinkingModalOpen(false);
+    setSelectedTransactionForLinking(null);
+  };
+
+  const handleSavePOLinks = async (poLinks: POLink[]) => {
+    if (!selectedTransactionForLinking) return;
+
+    try {
+      await updateTransaction(selectedTransactionForLinking.id, {
+        poLinks,
+        // Clear legacy fields if we have new PO links
+        ...(poLinks.length > 0 && {
+          linkedPOId: null,
+          linkedPOName: null
+        })
+      });
+      
+      await fetchData();
+      closePOLinkingModal();
+      
+      await showAlert({
+        title: 'Success',
+        message: `Successfully linked ${poLinks.length} purchase order(s) to transaction`,
+        variant: 'success'
+      });
+    } catch (error) {
+      console.error('Error saving PO links:', error);
+      await showAlert({
+        title: 'Error',
+        message: 'Error saving PO links. Please try again.',
+        variant: 'error'
+      });
+    }
+  };
+
   const startEdit = (transaction: Transaction) => {
     setEditingId(transaction.id);
     setEditData({
@@ -461,6 +513,28 @@ export const Transactions: React.FC = () => {
   const updateSplitAllocation = (index: number, field: 'subOrgId' | 'amount', value: string | number) => {
     const updated = [...splitAllocations];
     updated[index] = { ...updated[index], [field]: value };
+    setSplitAllocations(updated);
+  };
+
+  const distributeEvenly = () => {
+    if (!showSplitModal) return;
+    
+    const transaction = transactions.find(t => t.id === showSplitModal);
+    if (!transaction || splitAllocations.length === 0) return;
+
+    const validAllocations = splitAllocations.filter(alloc => alloc.subOrgId);
+    if (validAllocations.length === 0) return;
+
+    const totalAmount = transaction.debitAmount;
+    const amountPerAllocation = totalAmount / validAllocations.length;
+    
+    const updated = splitAllocations.map(alloc => {
+      if (alloc.subOrgId) {
+        return { ...alloc, amount: amountPerAllocation };
+      }
+      return alloc;
+    });
+    
     setSplitAllocations(updated);
   };
 
@@ -741,16 +815,43 @@ export const Transactions: React.FC = () => {
       {/* Transactions Table */}
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <CardTitle>Transaction History</CardTitle>
-            <div className="text-sm text-gray-400">
-              {filteredTransactions.length} rows
-              {subOrgFilter !== 'all' && subOrgFilter !== 'unallocated' && (
-                <div className="text-xs text-blue-400 mt-1">
-                  Includes split transactions
-                </div>
-              )}
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>Transaction History</CardTitle>
+              <div className="text-sm text-gray-400 mt-1">
+                {filteredTransactions.length} transactions
+                {subOrgFilter !== 'all' && subOrgFilter !== 'unallocated' && (
+                  <div className="text-xs text-blue-400 mt-1">
+                    Includes split transactions
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {/* Action Icons Legend */}
+            {hasRole('purchaser') && (
+              <div className="text-right">
+                <p className="text-xs font-medium text-gray-400 mb-2">Action Icons:</p>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-1">
+                    <Building className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">Assign Org</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <LinkIcon className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">Link POs</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Edit className="h-3 w-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">Notes</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Trash2 className="h-3 w-3 text-red-400" />
+                    <span className="text-xs text-gray-500">Delete</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </CardHeader>
         
@@ -762,9 +863,9 @@ export const Transactions: React.FC = () => {
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Description</th>
                 <th className="text-right py-3 px-4 font-medium text-gray-200">Amount</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Sub-Organization</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-200">Linked PO</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Linked POs</th>
                 <th className="text-left py-3 px-4 font-medium text-gray-200">Receipt</th>
+                <th className="text-left py-3 px-4 font-medium text-gray-200">Notes</th>
                 {hasRole('purchaser') && (
                   <th className="text-center py-3 px-4 font-medium text-gray-200">Actions</th>
                 )}
@@ -788,12 +889,7 @@ export const Transactions: React.FC = () => {
                     <td className="py-4 px-4">
                       {transaction.allocations && transaction.allocations.length > 0 ? (
                         transaction.allocations.length === 1 ? (
-                          <div className="flex items-center space-x-2">
-                            <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
-                            <Badge variant="info" size="sm">
-                              ${transaction.allocations[0].amount.toFixed(2)}
-                            </Badge>
-                          </div>
+                          <span className="text-gray-300">{transaction.allocations[0].subOrgName}</span>
                         ) : (
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2">
@@ -816,22 +912,51 @@ export const Transactions: React.FC = () => {
                       )}
                     </td>
                     <td className="py-4 px-4">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={editData.notes || ''}
-                          onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                          placeholder="Add notes..."
-                        />
-                      ) : (
-                        <span className="text-gray-300 text-sm">
-                          {transaction.notes || '-'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4 px-4">
-                      {transaction.linkedPOId ? (
+                      {transaction.poLinks && transaction.poLinks.length > 0 ? (
+                        <div className="space-y-1">
+                          {transaction.poLinks.length === 1 ? (
+                            <button
+                              onClick={() => handleViewPODetails(transaction.poLinks![0].poId)}
+                              disabled={loadingPODetails}
+                              className="flex items-center space-x-1 hover:bg-gray-600 p-1 rounded transition-colors"
+                            >
+                              <Badge variant="info" size="sm">
+                                {transaction.poLinks[0].poName}
+                              </Badge>
+                              <span className="text-xs text-gray-400">
+                                ${transaction.poLinks[0].amount.toFixed(2)}
+                              </span>
+                              <Eye className="h-3 w-3 text-gray-400" />
+                            </button>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center space-x-2">
+                                <Badge variant="info" size="sm">
+                                  {transaction.poLinks.length} POs
+                                </Badge>
+                                <span className="text-xs text-gray-400">
+                                  ${transaction.poLinks.reduce((sum, link) => sum + link.amount, 0).toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                {transaction.poLinks.map((link, index) => (
+                                  <div key={index} className="text-xs text-gray-400 flex justify-between items-center">
+                                    <button
+                                      onClick={() => handleViewPODetails(link.poId)}
+                                      className="hover:bg-gray-600 p-1 rounded transition-colors flex items-center space-x-1"
+                                    >
+                                      <span className="truncate mr-1">{link.poName}:</span>
+                                      <span className="font-medium">${link.amount.toFixed(2)}</span>
+                                      <Eye className="h-2 w-2" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : transaction.linkedPOId ? (
+                        // Legacy single PO link
                         <button
                           onClick={() => handleViewPODetails(transaction.linkedPOId!)}
                           disabled={loadingPODetails}
@@ -842,26 +967,6 @@ export const Transactions: React.FC = () => {
                           </Badge>
                           <Eye className="h-3 w-3 text-gray-400" />
                         </button>
-                      ) : isEditing ? (
-                        <select
-                          value={editData.linkedPOId || ''}
-                          onChange={(e) => {
-                            const selectedPO = pos.find(po => po.id === e.target.value);
-                            setEditData({ 
-                              ...editData, 
-                              linkedPOId: e.target.value,
-                              linkedPOName: selectedPO?.name || ''
-                            });
-                          }}
-                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
-                        >
-                          <option value="">No PO linked</option>
-                          {pos.map(po => (
-                            <option key={po.id} value={po.id}>
-                              {po.name || `PO #${po.id.slice(-6).toUpperCase()}`}
-                            </option>
-                          ))}
-                        </select>
                       ) : (
                         <span className="text-gray-500 text-sm">-</span>
                       )}
@@ -925,6 +1030,21 @@ export const Transactions: React.FC = () => {
                         <span className="text-gray-500 text-sm">No receipt</span>
                       )}
                     </td>
+                    <td className="py-4 px-4">
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editData.notes || ''}
+                          onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                          className="w-full px-2 py-1 text-sm bg-gray-600 border border-gray-500 rounded focus:ring-1 focus:ring-green-500 text-gray-100"
+                          placeholder="Add notes..."
+                        />
+                      ) : (
+                        <span className="text-gray-300 text-sm">
+                          {transaction.notes || '-'}
+                        </span>
+                      )}
+                    </td>
                     {hasRole('purchaser') && (
                       <td className="py-4 px-4 text-center">
                         {isEditing ? (
@@ -948,18 +1068,26 @@ export const Transactions: React.FC = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => startEdit(transaction)}
-                              title="Edit transaction"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
                               onClick={() => handleSplitTransaction(transaction.id)}
                               title="Split transaction"
                             >
                               <Building className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openPOLinkingModal(transaction)}
+                              title="Link purchase orders"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEdit(transaction)}
+                              title="Edit transaction"
+                            >
+                              <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
@@ -1012,6 +1140,69 @@ export const Transactions: React.FC = () => {
                 </p>
               </div>
               
+              {/* Allocation Summary */}
+              {(() => {
+                const transaction = transactions.find(t => t.id === showSplitModal);
+                if (!transaction) return null;
+                
+                const validAllocations = splitAllocations.filter(alloc => alloc.subOrgId);
+                const totalAllocated = validAllocations.reduce((sum, alloc) => sum + alloc.amount, 0);
+                const remaining = transaction.debitAmount - totalAllocated;
+                const isOverAllocated = totalAllocated > transaction.debitAmount;
+                const isUnderAllocated = totalAllocated < transaction.debitAmount;
+                
+                return (
+                  <div className="mb-6 p-4 bg-gray-700 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-300 text-sm">Allocation Summary</span>
+                      <span className={`text-sm font-medium ${
+                        isOverAllocated ? 'text-red-400' : 
+                        isUnderAllocated ? 'text-yellow-400' : 
+                        'text-green-400'
+                      }`}>
+                        {validAllocations.length} organization{validAllocations.length !== 1 ? 's' : ''} selected
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400">Total Allocated:</span>
+                      <span className={`font-medium ${
+                        isOverAllocated ? 'text-red-400' : 
+                        isUnderAllocated ? 'text-yellow-400' : 
+                        'text-green-400'
+                      }`}>
+                        ${totalAllocated.toFixed(2)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-400">Remaining:</span>
+                      <span className={`font-medium ${
+                        isOverAllocated ? 'text-red-400' : 
+                        isUnderAllocated ? 'text-yellow-400' : 
+                        'text-green-400'
+                      }`}>
+                        ${remaining.toFixed(2)}
+                      </span>
+                    </div>
+                    
+                    {/* Progress bar */}
+                    <div className="mt-2 w-full bg-gray-600 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isOverAllocated ? 'bg-red-500' : 
+                          isUnderAllocated ? 'bg-yellow-500' : 
+                          'bg-green-500'
+                        }`}
+                        style={{ 
+                          width: `${Math.min((totalAllocated / transaction.debitAmount) * 100, 100)}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+              
               <div className="space-y-4">
                 {splitAllocations.map((allocation, index) => (
                   <div key={index} className="flex items-center space-x-4 p-4 bg-gray-700 rounded-lg">
@@ -1032,10 +1223,10 @@ export const Transactions: React.FC = () => {
                         type="number"
                         step="0.01"
                         min="0"
-                        value={allocation.amount}
+                        value={allocation.amount === 0 ? '' : allocation.amount}
                         onChange={(e) => updateSplitAllocation(index, 'amount', parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-gray-100"
-                        placeholder="Amount"
+                        placeholder="0.00"
                       />
                     </div>
                     {splitAllocations.length > 1 && (
@@ -1053,13 +1244,24 @@ export const Transactions: React.FC = () => {
               </div>
               
               <div className="flex justify-between items-center mt-6">
-                <Button
-                  variant="outline"
-                  onClick={addSplitAllocation}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Allocation
-                </Button>
+                <div className="flex space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={addSplitAllocation}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Allocation
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={distributeEvenly}
+                    disabled={splitAllocations.filter(alloc => alloc.subOrgId).length === 0}
+                  >
+                    <Divide className="h-4 w-4 mr-2" />
+                    Distribute Evenly
+                  </Button>
+                </div>
                 
                 <div className="flex space-x-3">
                   <Button
@@ -1085,6 +1287,17 @@ export const Transactions: React.FC = () => {
           isOpen={isPODetailsModalOpen}
           onClose={closePODetailsModal}
           onPOUpdated={() => {}} // No updates needed from transactions page
+        />
+      )}
+
+      {/* PO Linking Modal */}
+      {selectedTransactionForLinking && (
+        <POLinkingModal
+          transaction={selectedTransactionForLinking}
+          availablePOs={pos}
+          isOpen={isPOLinkingModalOpen}
+          onClose={closePOLinkingModal}
+          onSave={handleSavePOLinks}
         />
       )}
 
